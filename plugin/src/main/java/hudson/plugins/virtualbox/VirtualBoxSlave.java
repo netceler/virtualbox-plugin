@@ -27,12 +27,13 @@ public class VirtualBoxSlave extends Slave {
   private final String virtualMachineName;
   private final String virtualMachineType;
   private final String virtualMachineStopMode;
+  private int startupWaitingPeriodSeconds;
 
   @DataBoundConstructor
   public VirtualBoxSlave(
       String name, String nodeDescription, String remoteFS, String numExecutors, Mode mode, String labelString,
       ComputerLauncher delegateLauncher, RetentionStrategy retentionStrategy, List<? extends NodeProperty<?>> nodeProperties,
-      String hostName, String virtualMachineName, String virtualMachineType, String virtualMachineStopMode
+      String hostName, String virtualMachineName, String virtualMachineType, String virtualMachineStopMode, int startupWaitingPeriodSeconds
   ) throws Descriptor.FormException, IOException {
     super(
         name,
@@ -41,7 +42,7 @@ public class VirtualBoxSlave extends Slave {
         numExecutors,
         mode,
         labelString,
-        new VirtualBoxComputerLauncher(delegateLauncher, hostName, virtualMachineName, virtualMachineType, virtualMachineStopMode),
+        new VirtualBoxComputerLauncher(delegateLauncher, hostName, virtualMachineName, virtualMachineType, virtualMachineStopMode,startupWaitingPeriodSeconds),
         retentionStrategy,
         nodeProperties
     );
@@ -49,6 +50,29 @@ public class VirtualBoxSlave extends Slave {
     this.virtualMachineName = virtualMachineName;
     this.virtualMachineType = virtualMachineType;
     this.virtualMachineStopMode = virtualMachineStopMode;
+    this.startupWaitingPeriodSeconds = startupWaitingPeriodSeconds;
+  }
+
+  public VirtualBoxSlave(
+      String name, String nodeDescription, String remoteFS, String numExecutors, Mode mode, String labelString,
+      ComputerLauncher delegateLauncher, RetentionStrategy retentionStrategy, List<? extends NodeProperty<?>> nodeProperties,
+      String hostName, String virtualMachineName, String virtualMachineType, String virtualMachineStopMode
+  ) throws Descriptor.FormException, IOException {
+      this(
+              name,
+              nodeDescription,
+              remoteFS,
+              numExecutors,
+              mode,
+              labelString,
+              delegateLauncher,
+              retentionStrategy,
+              nodeProperties,
+              hostName,
+              virtualMachineName,
+              virtualMachineType,
+              virtualMachineStopMode,
+              30);
   }
 
   public VirtualBoxSlave(
@@ -103,6 +127,13 @@ public class VirtualBoxSlave extends Slave {
    */
   public String getVirtualMachineStopMode() {
     return virtualMachineStopMode;
+  }
+
+  /**
+   * @return the number of second to wait for the virtual machine to be ready
+   */
+  public int getStartupWaitingPeriodSeconds() {
+    return startupWaitingPeriodSeconds;
   }
 
   @Override

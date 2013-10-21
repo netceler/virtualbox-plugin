@@ -23,8 +23,6 @@ import java.util.logging.Logger;
 public class VirtualBoxComputerLauncher extends ComputerLauncher {
   private static final Logger LOG = Logger.getLogger(VirtualBoxComputerLauncher.class.getName());
 
-  private static final int SECOND = 1000;
-
   private transient VirtualBoxMachine virtualMachine;
 
   private ComputerLauncher delegate;
@@ -37,14 +35,17 @@ public class VirtualBoxComputerLauncher extends ComputerLauncher {
 
   private String virtualMachineStopMode;
 
+  private int startupWaitingPeriodSeconds;
+
   @DataBoundConstructor
   public VirtualBoxComputerLauncher(ComputerLauncher delegate, String hostName, String virtualMachineName,
-      String virtualMachineType, String virtualMachineStopMode) {
+      String virtualMachineType, String virtualMachineStopMode, int startupWaitingPeriodSeconds) {
     this.delegate = delegate;
     this.hostName = hostName;
     this.virtualMachineName = virtualMachineName;
     this.virtualMachineType = virtualMachineType;
     this.virtualMachineStopMode = virtualMachineStopMode;
+    this.startupWaitingPeriodSeconds = startupWaitingPeriodSeconds;
     lookupVirtualMachineHandle();
   }
 
@@ -79,16 +80,12 @@ public class VirtualBoxComputerLauncher extends ComputerLauncher {
     }
     // Stage 2 of the launch. Called after the VirtualBox instance comes up.
     boolean successful = false;
-    int attempt = 0;
-    while (!successful) {
-      attempt++;
-      log(listener, "Sleep before stage 2 launcher, attempt " + attempt);
-      Thread.sleep(10 * SECOND);
-      successful = delegateLaunch(computer, listener);
-      if (!successful && attempt > 10) {
-        log(listener, "Maximum number of attempts reached");
-        return;
-      }
+    log(listener, "Waiting for " + startupWaitingPeriodSeconds + " seconds for the virtual machine to be ready");
+    Thread.sleep(startupWaitingPeriodSeconds * 1000);
+    successful = delegateLaunch(computer, listener);
+    if (!successful) {
+      log(listener, "Virtual machine still not ready :(");
+      return;
     }
   }
 

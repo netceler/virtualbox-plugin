@@ -4,14 +4,18 @@ import hudson.Plugin;
 import hudson.model.Hudson;
 import hudson.model.Node;
 import hudson.slaves.Cloud;
+import hudson.util.FormValidation;
 import hudson.util.ListBoxModel;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
 import javax.servlet.ServletException;
+
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.StaplerResponse;
@@ -149,5 +153,24 @@ public class VirtualBoxPlugin extends Plugin {
       }
     }
     resp.sendError(404);
+  }
+
+  /**
+   * For UI.
+   * Checks the number of seconds to wait for a virtual machine to be ready.
+   */
+  public FormValidation doCheckStartupWaitingPeriodSeconds (@QueryParameter String secsValue) throws IOException, ServletException {
+    try {
+      int v = Integer.parseInt(secsValue);
+      if (v < 0) {
+        return FormValidation.error("Negative value..");
+      } else if (v == 0) {
+        return FormValidation.warning("You declared this virtual machine to be ready right away. It probably needs a couple of seconds before it is ready to process jobs!");
+      } else {
+        return FormValidation.ok();
+      }
+    } catch (NumberFormatException e) {
+      return FormValidation.error("Not a number..");
+    }
   }
 }

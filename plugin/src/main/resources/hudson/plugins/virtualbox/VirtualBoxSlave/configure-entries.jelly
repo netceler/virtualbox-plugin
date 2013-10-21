@@ -42,6 +42,10 @@
     </select>
   </f:entry>
 
+  <f:entry title="${%Startup Idle (sec)}" field="startupWaitingPeriodSeconds">
+    <f:textbox default="60" checkUrl="'${rootURL}/plugin/virtualbox/checkStartupWaitingPeriodSeconds?secsValue='+this.value"/>
+  </f:entry>
+
   <!-- Copied from /hudson/slaves/DumbSlave/configure-entries.jelly : -->
 
   <f:entry title="${%Description}" help="/help/system-config/master-slave/description.html">
