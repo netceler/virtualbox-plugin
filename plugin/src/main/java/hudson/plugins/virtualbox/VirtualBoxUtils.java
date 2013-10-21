@@ -3,6 +3,7 @@ package hudson.plugins.virtualbox;
 
 import com.sun.xml.ws.commons.virtualbox_3_1.IVirtualBox;
 import com.sun.xml.ws.commons.virtualbox_3_1.IWebsessionManager;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,16 +14,20 @@ import java.util.Map;
 public final class VirtualBoxUtils {
 
   // public methods
-  public static long startVm(VirtualBoxMachine machine, String virtualMachineType, VirtualBoxLogger log) {
-    return getVboxControl(machine.getHost(), log).startVm(machine, virtualMachineType, log);
+  public static long startVm(VirtualBoxMachine machine, String snapshotName, String virtualMachineType, VirtualBoxLogger log) {
+    return getVboxControl(machine.getHost(), log).startVm(machine, snapshotName, virtualMachineType, log);
   }
 
-  public static long stopVm(VirtualBoxMachine machine, String virtualMachineStopMode, VirtualBoxLogger log) {
-    return getVboxControl(machine.getHost(), log).stopVm(machine, virtualMachineStopMode, log);
+  public static long stopVm(VirtualBoxMachine machine, String snapshotName, String virtualMachineStopMode, VirtualBoxLogger log) {
+    return getVboxControl(machine.getHost(), log).stopVm(machine, snapshotName, virtualMachineStopMode, log);
   }
 
   public static List<VirtualBoxMachine> getMachines(VirtualBoxCloud host, VirtualBoxLogger log) {
     return getVboxControl(host, log).getMachines(host, log);
+  }
+
+  public static String[] getSnapshots(VirtualBoxCloud host, String virtualMachineName, VirtualBoxSystemLog log) {
+    return getVboxControl(host, log).getSnapshots(virtualMachineName, log);
   }
 
   public static String getMacAddress(VirtualBoxMachine machine, VirtualBoxLogger log) {
@@ -89,4 +94,5 @@ public final class VirtualBoxUtils {
     log.logInfo("Connected to VirtualBox version " + version + " on host " + host.getUrl());
     return vboxControl;
   }
+
 }

@@ -31,6 +31,8 @@ public class VirtualBoxComputerLauncher extends ComputerLauncher {
 
   private String virtualMachineName;
 
+  private String snapshotName;
+
   private String virtualMachineType;
 
   private String virtualMachineStopMode;
@@ -39,10 +41,11 @@ public class VirtualBoxComputerLauncher extends ComputerLauncher {
 
   @DataBoundConstructor
   public VirtualBoxComputerLauncher(ComputerLauncher delegate, String hostName, String virtualMachineName,
-      String virtualMachineType, String virtualMachineStopMode, int startupWaitingPeriodSeconds) {
+      String snapshotName, String virtualMachineType, String virtualMachineStopMode, int startupWaitingPeriodSeconds) {
     this.delegate = delegate;
     this.hostName = hostName;
     this.virtualMachineName = virtualMachineName;
+    this.snapshotName = snapshotName;
     this.virtualMachineType = virtualMachineType;
     this.virtualMachineStopMode = virtualMachineStopMode;
     this.startupWaitingPeriodSeconds = startupWaitingPeriodSeconds;
@@ -67,7 +70,7 @@ public class VirtualBoxComputerLauncher extends ComputerLauncher {
         }
       }
       log(listener, Messages.VirtualBoxLauncher_startVM(virtualMachine));
-      long result = VirtualBoxUtils.startVm(virtualMachine, virtualMachineType, new VirtualBoxTaskListenerLog(listener, "[VirtualBox] "));
+      long result = VirtualBoxUtils.startVm(virtualMachine, snapshotName, virtualMachineType, new VirtualBoxTaskListenerLog(listener, "[VirtualBox] "));
       if (result != 0) {
         listener.fatalError("Unable to launch");
         return;
@@ -129,7 +132,7 @@ public class VirtualBoxComputerLauncher extends ComputerLauncher {
 
     try {
       log(listener, Messages.VirtualBoxLauncher_stopVM(virtualMachine));
-      long result = VirtualBoxUtils.stopVm(virtualMachine, virtualMachineStopMode, new VirtualBoxTaskListenerLog(listener, "[VirtualBox] "));
+      long result = VirtualBoxUtils.stopVm(virtualMachine, snapshotName, virtualMachineStopMode, new VirtualBoxTaskListenerLog(listener, "[VirtualBox] "));
       if (result != 0) {
         listener.fatalError("Unable to stop");
       }

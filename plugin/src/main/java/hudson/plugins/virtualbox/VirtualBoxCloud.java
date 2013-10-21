@@ -8,11 +8,13 @@ import hudson.slaves.Cloud;
 import hudson.slaves.NodeProvisioner;
 import hudson.util.FormValidation;
 import hudson.util.Scrambler;
+
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 
@@ -69,6 +71,10 @@ public class VirtualBoxCloud extends Cloud {
     return null;
   }
 
+  public String[] getSnapshots(String virtualMachineName) {
+      return VirtualBoxUtils.getSnapshots(this, virtualMachineName, new VirtualBoxSystemLog(LOG, "[VirtualBox] "));
+  }
+
   @Extension
   public static class DescriptorImpl extends Descriptor<Cloud> {
     @Override
@@ -117,4 +123,5 @@ public class VirtualBoxCloud extends Cloud {
     sb.append('}');
     return sb.toString();
   }
+
 }

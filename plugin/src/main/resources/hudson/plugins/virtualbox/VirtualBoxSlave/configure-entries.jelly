@@ -17,10 +17,21 @@
   </f:entry>
 
   <f:entry title="${%Virtual Machine Name}" field="virtualMachineName">
-    <select class="setting-input" name="virtualMachineName" value="${it.virtualMachineName}">
+    <select class="setting-input" name="virtualMachineName" value="${it.virtualMachineName}" onchange="updateListBox(document.getElementsByName('snapshotName')[0],'${rootURL}/plugin/virtualbox/snapshotNameValues?vm='+encode(this.value)+'&amp;hostName='+encode(document.getElementsByName('hostName')[0].options[document.getElementsByName('hostName')[0].selectedIndex].text))">
       <j:forEach var="v" items="${descriptor.getDefinedVirtualMachines(it.hostName)}">
         <option selected="${v.name==it.virtualMachineName?'true':null}">
           ${v.name}
+        </option>
+      </j:forEach>
+    </select>
+  </f:entry>
+
+  <f:entry title="${%Revert Snapshot}" field="snapshotName">
+    <select class="setting-input" name="snapshotName" value="${instance.snapshotName}">
+      <option selected="${it.snapshotName == null || it.snapshotName == ''}"></option>
+      <j:forEach var="sshot" items="${descriptor.getDefinedSnapshots(it.hostName, it.virtualMachineName)}" varStatus="loop">
+        <option selected="${sshot==it.snapshotName?'true':null}">
+          ${sshot}
         </option>
       </j:forEach>
     </select>

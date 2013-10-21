@@ -1,6 +1,7 @@
 package hudson.plugins.virtualbox;
 
 import com.sun.xml.ws.commons.virtualbox_3_1.*;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -68,6 +69,10 @@ public final class VirtualBoxControlV31 implements VirtualBoxControl {
     return result;
   }
 
+  public String[] getSnapshots(String virtualMachineName, VirtualBoxSystemLog log) {
+      return new String[0];
+  }
+
   /**
    * Starts specified VirtualBox virtual machine.
    *
@@ -75,7 +80,7 @@ public final class VirtualBoxControlV31 implements VirtualBoxControl {
    * @param type      session type (can be headless, vrdp, gui, sdl)
    * @return result code
    */
-  public synchronized long startVm(VirtualBoxMachine vbMachine, String type, VirtualBoxLogger log) {
+  public synchronized long startVm(VirtualBoxMachine vbMachine, String snapshotName, String type, VirtualBoxLogger log) {
     ConnectionHolder holder = connect(hostUrl, userName, password);
     IMachine machine = holder.vbox.findMachine(vbMachine.getName());
     if (org.virtualbox_3_1.MachineState.RUNNING == machine.getState()) {
@@ -103,7 +108,7 @@ public final class VirtualBoxControlV31 implements VirtualBoxControl {
    * @param vbMachine virtual machine to stop
    * @return result code
    */
-  public synchronized long stopVm(VirtualBoxMachine vbMachine, String stopMode, VirtualBoxLogger log) {
+  public synchronized long stopVm(VirtualBoxMachine vbMachine, String snapshotName, String stopMode, VirtualBoxLogger log) {
     ConnectionHolder holder = connect(hostUrl, userName, password);
     IMachine machine = holder.vbox.findMachine(vbMachine.getName());
     if (org.virtualbox_3_1.MachineState.RUNNING != machine.getState()) {
@@ -132,4 +137,5 @@ public final class VirtualBoxControlV31 implements VirtualBoxControl {
     holder.disconnect();
     return macAddress;
   }
+
 }

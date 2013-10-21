@@ -9,9 +9,11 @@ import hudson.slaves.ComputerLauncher;
 import hudson.slaves.NodeProperty;
 import hudson.slaves.RetentionStrategy;
 import hudson.util.FormValidation;
+
 import java.io.IOException;
 import java.util.List;
 import java.util.logging.Logger;
+
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 
@@ -25,6 +27,7 @@ public class VirtualBoxSlave extends Slave {
 
   private final String hostName;
   private final String virtualMachineName;
+  private final String snapshotName;
   private final String virtualMachineType;
   private final String virtualMachineStopMode;
   private int startupWaitingPeriodSeconds;
@@ -33,7 +36,8 @@ public class VirtualBoxSlave extends Slave {
   public VirtualBoxSlave(
       String name, String nodeDescription, String remoteFS, String numExecutors, Mode mode, String labelString,
       ComputerLauncher delegateLauncher, RetentionStrategy retentionStrategy, List<? extends NodeProperty<?>> nodeProperties,
-      String hostName, String virtualMachineName, String virtualMachineType, String virtualMachineStopMode, int startupWaitingPeriodSeconds
+      String hostName, String virtualMachineName, String snapshotName, String virtualMachineType, String virtualMachineStopMode,
+      int startupWaitingPeriodSeconds
   ) throws Descriptor.FormException, IOException {
     super(
         name,
@@ -42,15 +46,39 @@ public class VirtualBoxSlave extends Slave {
         numExecutors,
         mode,
         labelString,
-        new VirtualBoxComputerLauncher(delegateLauncher, hostName, virtualMachineName, virtualMachineType, virtualMachineStopMode,startupWaitingPeriodSeconds),
+        new VirtualBoxComputerLauncher(delegateLauncher, hostName, virtualMachineName, snapshotName, virtualMachineType, virtualMachineStopMode,startupWaitingPeriodSeconds),
         retentionStrategy,
         nodeProperties
     );
     this.hostName = hostName;
     this.virtualMachineName = virtualMachineName;
+    this.snapshotName = snapshotName;
     this.virtualMachineType = virtualMachineType;
     this.virtualMachineStopMode = virtualMachineStopMode;
     this.startupWaitingPeriodSeconds = startupWaitingPeriodSeconds;
+  }
+
+  public VirtualBoxSlave(
+          String name, String nodeDescription, String remoteFS, String numExecutors, Mode mode, String labelString,
+          ComputerLauncher delegateLauncher, RetentionStrategy retentionStrategy, List<? extends NodeProperty<?>> nodeProperties,
+          String hostName, String virtualMachineName, String virtualMachineType, String virtualMachineStopMode, int startupWaitingPeriodSeconds
+      ) throws Descriptor.FormException, IOException {
+      this(
+              name,
+              nodeDescription,
+              remoteFS,
+              numExecutors,
+              mode,
+              labelString,
+              delegateLauncher,
+              retentionStrategy,
+              nodeProperties,
+              hostName,
+              virtualMachineName,
+              null,
+              virtualMachineType,
+              virtualMachineStopMode,
+              startupWaitingPeriodSeconds);
   }
 
   public VirtualBoxSlave(
@@ -116,6 +144,13 @@ public class VirtualBoxSlave extends Slave {
   }
 
   /**
+   * @return the name of the snapshot to revert to on shutdown, or null
+   */
+  public String getSnapshotName() {
+    return snapshotName;
+  }
+
+  /**
    * @return type of virtual machine, can be headless, vrdp, gui, or sdl
    */
   public String getVirtualMachineType() {
@@ -173,6 +208,14 @@ public class VirtualBoxSlave extends Slave {
      */
     public List<VirtualBoxCloud> getHosts() {
       return VirtualBoxPlugin.getHosts();
+    }
+
+    public String[] getDefinedSnapshots(String hostName, String virtualMachineName) {
+      VirtualBoxCloud host = VirtualBoxPlugin.getHost(hostName);
+      if (host != null) {
+        return host.getSnapshots(virtualMachineName);
+      }
+      return new String[0];
     }
 
     /**

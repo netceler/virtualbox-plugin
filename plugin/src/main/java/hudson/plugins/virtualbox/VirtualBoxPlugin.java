@@ -117,6 +117,20 @@ public class VirtualBoxPlugin extends Plugin {
     m.writeTo(req, resp);
   }
 
+  public void doSnapshotNameValues(StaplerRequest req, StaplerResponse rsp, @QueryParameter("vm") String vm, @QueryParameter("hostName") String hostName) throws IOException, ServletException {
+    ListBoxModel m = new ListBoxModel();
+    m.add(new ListBoxModel.Option("", ""));
+    VirtualBoxCloud host = getHost(hostName);
+    if (host != null) {
+      String[] ss  = host.getSnapshots(vm);
+      for (String sshot : ss) {
+        m.add(new ListBoxModel.Option(sshot, sshot));
+      }
+    }
+
+    m.writeTo(req, rsp);
+  }
+
   /**
    * Used for discovering {@link VirtualBoxSlave} with specified MAC Address.
    * HTTP 404 Error will be returned, if slave can't be found.

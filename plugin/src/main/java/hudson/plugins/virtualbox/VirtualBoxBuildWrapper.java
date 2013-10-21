@@ -25,14 +25,14 @@ public class VirtualBoxBuildWrapper extends BuildWrapper {
   public Environment setUp(AbstractBuild build, Launcher launcher, BuildListener listener) throws IOException, InterruptedException {
     VirtualBoxMachine machine = VirtualBoxPlugin.getVirtualBoxMachine(getHostName(), getVirtualMachineName());
     listener.getLogger().println(Messages.VirtualBoxLauncher_startVM(machine));
-    VirtualBoxUtils.startVm(machine, "headless", new VirtualBoxTaskListenerLog(listener, "[VirtualBox] ")); // TODO type
+    VirtualBoxUtils.startVm(machine, null, "headless", new VirtualBoxTaskListenerLog(listener, "[VirtualBox] ")); // TODO type
 
     class EnvironmentImpl extends Environment {
       @Override
       public boolean tearDown(AbstractBuild build, BuildListener listener) throws IOException, InterruptedException {
         VirtualBoxMachine machine = VirtualBoxPlugin.getVirtualBoxMachine(getHostName(), getVirtualMachineName());
         listener.getLogger().println(Messages.VirtualBoxLauncher_stopVM(machine));
-        VirtualBoxUtils.stopVm(machine, "pause", new VirtualBoxTaskListenerLog(listener, "[VirtualBox] "));
+        VirtualBoxUtils.stopVm(machine, null, "pause", new VirtualBoxTaskListenerLog(listener, "[VirtualBox] "));
         return true;
       }
     }

@@ -2,6 +2,7 @@ package hudson.plugins.virtualbox;
 
 import java.util.ArrayList;
 import java.util.List;
+
 import org.virtualbox_4_0.*;
 
 /**
@@ -47,6 +48,45 @@ public final class VirtualBoxControlV40 implements VirtualBoxControl {
     return result;
   }
 
+  public String[] getSnapshots(String virtualMachineName, VirtualBoxSystemLog log) {
+    List<SnapshotData> snapshots = new ArrayList<SnapshotData>();
+    for (IMachine machine : vbox.getMachines()) {
+      if (virtualMachineName.equals(machine.getName()) && machine.getSnapshotCount() > 0) {
+        ISnapshot root = findRootSnapshot(machine);
+        fillSnapshot(snapshots, root);
+      }
+    }
+    String[] snapshotNames = new String[snapshots.size()];
+    for (int i = 0 ; i < snapshots.size() ; i++) {
+      snapshotNames[i] = snapshots.get(i).name;
+    }
+    return snapshotNames;
+  }
+
+  private static ISnapshot findRootSnapshot(IMachine machine) {
+    ISnapshot root = machine.getCurrentSnapshot();
+    while (root.getParent() != null) {
+      root = root.getParent();
+    }
+    return root;
+  }
+
+  private List<SnapshotData> fillSnapshot(List<SnapshotData> snapshotList, ISnapshot snapshot) {
+    if (snapshot != null) {
+      SnapshotData snapshotData = new SnapshotData();
+      snapshotData.name = snapshot.getName();
+      snapshotData.id = snapshot.getId();
+      snapshotList.add(snapshotData);
+      if (snapshot.getChildren() != null) {
+        for (ISnapshot child : snapshot.getChildren()) {
+          // call fillSnapshot recursive
+          snapshotList = fillSnapshot(snapshotList, child);
+        }
+      }
+    }
+    return snapshotList;
+  }
+
   /**
    * Starts specified VirtualBox virtual machine.
    *
@@ -55,11 +95,16 @@ public final class VirtualBoxControlV40 implements VirtualBoxControl {
    * @param log
    * @return result code
    */
-  public synchronized long startVm(VirtualBoxMachine vbMachine, String type, VirtualBoxLogger log) {
+  public synchronized long startVm(VirtualBoxMachine vbMachine, String snapshotName, String type, VirtualBoxLogger log) {
     IMachine machine = vbox.findMachine(vbMachine.getName());
     if (null == machine) {
       log.logFatalError("Cannot find node: " + vbMachine.getName());
       return -1;
+    }
+
+    ISnapshot snapshot = null;
+    if (snapshotName != null) {
+      snapshot = machine.findSnapshot(snapshotName);
     }
 
     // states diagram: https://www.virtualbox.org/sdkref/_virtual_box_8idl.html#80b08f71210afe16038e904a656ed9eb
@@ -123,6 +168,13 @@ public final class VirtualBoxControlV40 implements VirtualBoxControl {
     log.logInfo("starting node " + vbMachine.getName() + " from state " + state.toString());
 
     // powerUp from Saved, Aborted or PoweredOff states
+    if (snapshot != null) {
+      log.logInfo("Reverting node " + vbMachine.getName() + " to snapshot " + snapshotName);
+      session = getSession(machine);
+      progress = session.getConsole().restoreSnapshot(snapshot);
+      progress.waitForCompletion(-1);
+      session.unlockMachine();
+    }
     session = getSession(null);
     String env = "";
     progress = machine.launchVMProcess(session, type, env);
@@ -146,11 +198,16 @@ public final class VirtualBoxControlV40 implements VirtualBoxControl {
    * @param log
    * @return result code
    */
-  public synchronized long stopVm(VirtualBoxMachine vbMachine, String stopMode, VirtualBoxLogger log) {
+  public synchronized long stopVm(VirtualBoxMachine vbMachine, String snapshotName, String stopMode, VirtualBoxLogger log) {
     IMachine machine = vbox.findMachine(vbMachine.getName());
     if (null == machine) {
       log.logFatalError("Cannot find node: " + vbMachine.getName());
       return -1;
+    }
+
+    ISnapshot snapshot = null;
+    if (snapshotName != null) {
+      snapshot = machine.findSnapshot(snapshotName);
     }
 
     // states diagram: https://www.virtualbox.org/sdkref/_virtual_box_8idl.html#80b08f71210afe16038e904a656ed9eb
@@ -185,6 +242,15 @@ public final class VirtualBoxControlV40 implements VirtualBoxControl {
     if (MachineState.Stuck == state || "powerdown".equals(stopMode)) {
       // for Stuck state call powerDown and go to PoweredOff state
       progress = session.getConsole().powerDown();
+    } else if (snapshot != null) {
+      log.logInfo("Reverting node " + vbMachine.getName() + " to snapshot " + snapshotName);
+      progress = session.getConsole().powerDown();
+      progress.waitForCompletion(-1);
+
+      session = getSession(machine);
+      progress = session.getConsole().restoreSnapshot(snapshot);
+      progress.waitForCompletion(-1);
+      session.unlockMachine();
     } else {
       // Running or Paused
       progress = session.getConsole().saveState();
