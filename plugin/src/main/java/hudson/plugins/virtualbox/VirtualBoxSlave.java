@@ -31,13 +31,14 @@ public class VirtualBoxSlave extends Slave {
   private final String virtualMachineType;
   private final String virtualMachineStopMode;
   private int startupWaitingPeriodSeconds;
+  private boolean revertAfterBuild;
 
   @DataBoundConstructor
   public VirtualBoxSlave(
       String name, String nodeDescription, String remoteFS, String numExecutors, Mode mode, String labelString,
       ComputerLauncher delegateLauncher, RetentionStrategy retentionStrategy, List<? extends NodeProperty<?>> nodeProperties,
       String hostName, String virtualMachineName, String snapshotName, String virtualMachineType, String virtualMachineStopMode,
-      int startupWaitingPeriodSeconds
+      int startupWaitingPeriodSeconds, boolean revertAfterBuild
   ) throws Descriptor.FormException, IOException {
     super(
         name,
@@ -56,6 +57,32 @@ public class VirtualBoxSlave extends Slave {
     this.virtualMachineType = virtualMachineType;
     this.virtualMachineStopMode = virtualMachineStopMode;
     this.startupWaitingPeriodSeconds = startupWaitingPeriodSeconds;
+    this.revertAfterBuild = snapshotName != null && revertAfterBuild;
+  }
+
+  public VirtualBoxSlave(
+          String name, String nodeDescription, String remoteFS, String numExecutors, Mode mode, String labelString,
+          ComputerLauncher delegateLauncher, RetentionStrategy retentionStrategy, List<? extends NodeProperty<?>> nodeProperties,
+          String hostName, String virtualMachineName, String snapshotName, String virtualMachineType, String virtualMachineStopMode,
+          int startupWaitingPeriodSeconds
+      ) throws Descriptor.FormException, IOException {
+      this(
+              name,
+              nodeDescription,
+              remoteFS,
+              numExecutors,
+              mode,
+              labelString,
+              delegateLauncher,
+              retentionStrategy,
+              nodeProperties,
+              hostName,
+              virtualMachineName,
+              null,
+              virtualMachineType,
+              virtualMachineStopMode,
+              startupWaitingPeriodSeconds,
+              false);
   }
 
   public VirtualBoxSlave(
@@ -169,6 +196,13 @@ public class VirtualBoxSlave extends Slave {
    */
   public int getStartupWaitingPeriodSeconds() {
     return startupWaitingPeriodSeconds;
+  }
+
+  /**
+   * @return Whether to revert this slave to the given snapshot after each build it executes
+   */
+  public boolean isRevertAfterBuild() {
+    return revertAfterBuild;
   }
 
   @Override

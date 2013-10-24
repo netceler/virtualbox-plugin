@@ -37,6 +37,10 @@
     </select>
   </f:entry>
 
+  <f:entry title="">
+    <f:checkbox name="revertAfterBuild" title="${%Revert to snapshot after each build ?}"/>
+  </f:entry>
+
   <f:entry title="${%Virtual Machine Type}" field="virtualMachineType">
     <select class="setting-input" name="virtualMachineType" value="${it.virtualMachineType}">
       <f:option value="headless" selected="${it.virtualMachineType == 'headless'}">headless</f:option>
