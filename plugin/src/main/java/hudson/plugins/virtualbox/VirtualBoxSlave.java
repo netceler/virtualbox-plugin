@@ -201,7 +201,7 @@ public class VirtualBoxSlave extends Slave {
   /**
    * @return Whether to revert this slave to the given snapshot after each build it executes
    */
-  public boolean isRevertAfterBuild() {
+  public boolean getRevertAfterBuild() {
     return revertAfterBuild;
   }
 

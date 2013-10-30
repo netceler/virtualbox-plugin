@@ -39,7 +39,7 @@ public class VirtualBoxListener extends RunListener<Run<?, ?>> implements Serial
                     LOG.info("Run " + r.getDisplayName() + " completed on computer " + c.getDisplayName()
                             + " which is a VirtualBox slave.");
                     final VirtualBoxSlave slave = (VirtualBoxSlave) n;
-                    if (slave.isRevertAfterBuild()) {
+                    if (slave.getRevertAfterBuild()) {
                         LOG.info("Reverting slave " + slave.getDisplayName()
                                 + " to configured snapshot, as requested per configuration of this slave.");
                         pendings.put(sc,
