@@ -25,6 +25,10 @@ public class VirtualBoxComputerLauncher extends ComputerLauncher {
 
   private transient VirtualBoxMachine virtualMachine;
 
+  private transient boolean launching = false;
+
+  private transient boolean disconnecting = false;
+
   private ComputerLauncher delegate;
 
   private String hostName;
@@ -58,6 +62,12 @@ public class VirtualBoxComputerLauncher extends ComputerLauncher {
 
   @Override
   public void launch(SlaveComputer computer, TaskListener listener) throws IOException, InterruptedException {
+    if (launching) {
+      log(listener, "Node " + virtualMachineName + " already being launched !");
+      return;
+    }
+
+    launching = true;
     log(listener, "Launching node " + virtualMachineName);
     try {
       // Connect to VirtualBox host
@@ -85,6 +95,7 @@ public class VirtualBoxComputerLauncher extends ComputerLauncher {
     boolean successful = false;
     log(listener, "Waiting for " + startupWaitingPeriodSeconds + " seconds for the virtual machine to be ready");
     Thread.sleep(startupWaitingPeriodSeconds * 1000);
+    launching = false;
     successful = delegateLaunch(computer, listener);
     if (!successful) {
       log(listener, "Virtual machine still not ready :(");
@@ -125,6 +136,16 @@ public class VirtualBoxComputerLauncher extends ComputerLauncher {
 
   @Override
   public void afterDisconnect(SlaveComputer computer, TaskListener listener) {
+    // Warning : this function is called twice when stopping Jenkins !
+    // from SlaveComputer.setChannel() -> SlaveComputer$ChannelListener.onClosed()
+    //and from SlaveComputer.disconnect() -> SlaveComputer$Runnable.run()
+    // so we have to take care not call VirtualBoxUtils.stopVm twice because it leads to problems
+    if (disconnecting) {
+      log(listener, "Node " + virtualMachineName + " already being disconnected !");
+      return;
+    }
+
+    disconnecting = true;
     // Stage 2 of the afterDisconnect
     log(listener, "Starting stage 2 afterDisconnect");
     getCore().afterDisconnect(computer, listener);
@@ -139,6 +160,7 @@ public class VirtualBoxComputerLauncher extends ComputerLauncher {
     } catch (Throwable e) {
       listener.fatalError(e.getMessage(), e);
     }
+    disconnecting = false;
   }
 
   /**
