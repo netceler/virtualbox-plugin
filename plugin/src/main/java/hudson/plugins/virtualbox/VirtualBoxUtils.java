@@ -51,8 +51,8 @@ public final class VirtualBoxUtils {
    */
   private static HashMap<String, VirtualBoxControl> vboxControls = new HashMap<String, VirtualBoxControl>();
 
-  private synchronized static VirtualBoxControl getVboxControl(VirtualBoxCloud host, VirtualBoxLogger log) {
-    VirtualBoxControl vboxControl = (VirtualBoxControl)vboxControls.get(host.toString());
+  private static VirtualBoxControl getVboxControl(VirtualBoxCloud host, VirtualBoxLogger log) {
+    VirtualBoxControl vboxControl = vboxControls.get(host.toString());
     if (null != vboxControl) {
       if (vboxControl.isConnected()) {
         return vboxControl;
@@ -60,9 +60,12 @@ public final class VirtualBoxUtils {
       log.logInfo("Lost connection to " + host.getUrl() + ", reconnecting");
       vboxControls.remove(host.toString()); // force a reconnect
     }
-    vboxControl = createVboxControl(host, log);
 
-    vboxControls.put(host.toString(), vboxControl);
+    synchronized (vboxControls) {
+        vboxControl = createVboxControl(host, log);
+        vboxControls.put(host.toString(), vboxControl);
+    }
+
     return vboxControl;
   }
 

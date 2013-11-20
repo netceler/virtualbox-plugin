@@ -103,7 +103,6 @@ public class VirtualBoxPlugin extends Plugin {
   /**
    * For UI.
    */
-  @SuppressWarnings({"UnusedDeclaration", "JavaDoc"})
   public void doComputerNameValues(StaplerRequest req, StaplerResponse resp, @QueryParameter("hostName") String hostName)
       throws IOException, ServletException {
     ListBoxModel m = new ListBoxModel();
@@ -146,7 +145,6 @@ public class VirtualBoxPlugin extends Plugin {
    * @param macAddress MAC Address
    * @throws IOException if something wrong
    */
-  @SuppressWarnings({"UnusedDeclaration"})
   public void doGetSlaveAgent(StaplerRequest req, StaplerResponse resp, @QueryParameter("macAddress") String macAddress)
       throws IOException {
     LOG.log(Level.INFO, "Searching VirtualBox machine with MacAddress {0}", macAddress);

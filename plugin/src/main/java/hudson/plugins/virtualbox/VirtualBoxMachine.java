@@ -8,6 +8,8 @@ import org.kohsuke.stapler.DataBoundConstructor;
  */
 public class VirtualBoxMachine implements Serializable, Comparable<VirtualBoxMachine> {
 
+  private static final long serialVersionUID = -2729300820302472227L;
+
   private final VirtualBoxCloud host;
   private final String name;
 

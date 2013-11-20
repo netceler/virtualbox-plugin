@@ -23,6 +23,8 @@ import org.kohsuke.stapler.QueryParameter;
  * @author Evgeny Mandrikov
  */
 public class VirtualBoxSlave extends Slave {
+
+  private static final long serialVersionUID = 3024357845307837702L;
   private static final Logger LOG = Logger.getLogger(VirtualBoxSlave.class.getName());
 
   private final String hostName;
@@ -36,7 +38,7 @@ public class VirtualBoxSlave extends Slave {
   @DataBoundConstructor
   public VirtualBoxSlave(
       String name, String nodeDescription, String remoteFS, String numExecutors, Mode mode, String labelString,
-      ComputerLauncher delegateLauncher, RetentionStrategy retentionStrategy, List<? extends NodeProperty<?>> nodeProperties,
+      ComputerLauncher delegateLauncher, RetentionStrategy<?> retentionStrategy, List<? extends NodeProperty<?>> nodeProperties,
       String hostName, String virtualMachineName, String snapshotName, String virtualMachineType, String virtualMachineStopMode,
       int startupWaitingPeriodSeconds, boolean revertAfterBuild
   ) throws Descriptor.FormException, IOException {
@@ -62,7 +64,7 @@ public class VirtualBoxSlave extends Slave {
 
   public VirtualBoxSlave(
           String name, String nodeDescription, String remoteFS, String numExecutors, Mode mode, String labelString,
-          ComputerLauncher delegateLauncher, RetentionStrategy retentionStrategy, List<? extends NodeProperty<?>> nodeProperties,
+          ComputerLauncher delegateLauncher, RetentionStrategy<?> retentionStrategy, List<? extends NodeProperty<?>> nodeProperties,
           String hostName, String virtualMachineName, String snapshotName, String virtualMachineType, String virtualMachineStopMode,
           int startupWaitingPeriodSeconds
       ) throws Descriptor.FormException, IOException {
@@ -87,7 +89,7 @@ public class VirtualBoxSlave extends Slave {
 
   public VirtualBoxSlave(
           String name, String nodeDescription, String remoteFS, String numExecutors, Mode mode, String labelString,
-          ComputerLauncher delegateLauncher, RetentionStrategy retentionStrategy, List<? extends NodeProperty<?>> nodeProperties,
+          ComputerLauncher delegateLauncher, RetentionStrategy<?> retentionStrategy, List<? extends NodeProperty<?>> nodeProperties,
           String hostName, String virtualMachineName, String virtualMachineType, String virtualMachineStopMode, int startupWaitingPeriodSeconds
       ) throws Descriptor.FormException, IOException {
       this(
@@ -110,7 +112,7 @@ public class VirtualBoxSlave extends Slave {
 
   public VirtualBoxSlave(
       String name, String nodeDescription, String remoteFS, String numExecutors, Mode mode, String labelString,
-      ComputerLauncher delegateLauncher, RetentionStrategy retentionStrategy, List<? extends NodeProperty<?>> nodeProperties,
+      ComputerLauncher delegateLauncher, RetentionStrategy<?> retentionStrategy, List<? extends NodeProperty<?>> nodeProperties,
       String hostName, String virtualMachineName, String virtualMachineType, String virtualMachineStopMode
   ) throws Descriptor.FormException, IOException {
       this(
@@ -132,7 +134,7 @@ public class VirtualBoxSlave extends Slave {
 
   public VirtualBoxSlave(
       String name, String nodeDescription, String remoteFS, String numExecutors, Mode mode, String labelString,
-      ComputerLauncher delegateLauncher, RetentionStrategy retentionStrategy, List<? extends NodeProperty<?>> nodeProperties,
+      ComputerLauncher delegateLauncher, RetentionStrategy<?> retentionStrategy, List<? extends NodeProperty<?>> nodeProperties,
       String hostName, String virtualMachineName, String virtualMachineType
   ) throws Descriptor.FormException, IOException {
     this(
