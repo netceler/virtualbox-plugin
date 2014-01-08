@@ -1,5 +1,10 @@
 package hudson.plugins.virtualbox;
 
+import static hudson.plugins.virtualbox.VirtualBoxLogger.logError;
+import static hudson.plugins.virtualbox.VirtualBoxLogger.logFatalError;
+import static hudson.plugins.virtualbox.VirtualBoxLogger.logInfo;
+import static hudson.plugins.virtualbox.VirtualBoxLogger.logWarning;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -40,7 +45,7 @@ public final class VirtualBoxControlV42 implements VirtualBoxControl {
      * @param host VirtualBox host
      * @return list of virtual machines installed on specified host
      */
-    public synchronized List<VirtualBoxMachine> getMachines(VirtualBoxCloud host, VirtualBoxLogger log) {
+    public synchronized List<VirtualBoxMachine> getMachines(VirtualBoxCloud host) {
         List<VirtualBoxMachine> result = new ArrayList<VirtualBoxMachine>();
         for (IMachine machine : vbox.getMachines()) {
             result.add(new VirtualBoxMachine(host, machine.getName()));
@@ -48,7 +53,7 @@ public final class VirtualBoxControlV42 implements VirtualBoxControl {
         return result;
     }
 
-    public String[] getSnapshots(String virtualMachineName, VirtualBoxSystemLog log) {
+    public String[] getSnapshots(String virtualMachineName) {
         List<SnapshotData> snapshots = new ArrayList<SnapshotData>();
         for (IMachine machine : vbox.getMachines()) {
             if (virtualMachineName.equals(machine.getName()) && machine.getSnapshotCount() > 0) {
@@ -92,13 +97,12 @@ public final class VirtualBoxControlV42 implements VirtualBoxControl {
      *
      * @param vbMachine virtual machine to start
      * @param type      session type (can be headless, vrdp, gui, sdl)
-     * @param log
      * @return result code
      */
-    public synchronized long startVm(VirtualBoxMachine vbMachine, String snapshotName, String type, VirtualBoxLogger log) {
+    public synchronized long startVm(VirtualBoxMachine vbMachine, String snapshotName, String type) {
         IMachine machine = vbox.findMachine(vbMachine.getName());
         if (null == machine) {
-            log.logFatalError("Cannot find node: " + vbMachine.getName());
+            logError("Cannot find node: " + vbMachine.getName());
             return -1;
         }
 
@@ -114,7 +118,7 @@ public final class VirtualBoxControlV42 implements VirtualBoxControl {
 
         // wait for transient states to finish
         while (state.value() >= MachineState.FirstTransient.value() && state.value() <= MachineState.LastTransient.value()) {
-            log.logInfo("node " + vbMachine.getName() + " in state " + state.toString());
+            logInfo("node " + vbMachine.getName() + " in state " + state.toString());
             try {
                 Thread.sleep(1000);
             } catch (InterruptedException e) {}
@@ -122,17 +126,17 @@ public final class VirtualBoxControlV42 implements VirtualBoxControl {
         }
 
         if (MachineState.Running == state) {
-            log.logInfo("node " + vbMachine.getName() + " in state " + state.toString());
-            log.logInfo("node " + vbMachine.getName() + " started");
+            logInfo("node " + vbMachine.getName() + " in state " + state.toString());
+            logInfo("node " + vbMachine.getName() + " started");
             return 0;
         }
 
         if (MachineState.Stuck == state || MachineState.Paused == state) {
-            log.logInfo("starting node " + vbMachine.getName() + " from state " + state.toString());
+            logInfo("starting node " + vbMachine.getName() + " from state " + state.toString());
             try {
                 session = getSession(machine);
             } catch (Exception e) {
-                log.logFatalError("node " + vbMachine.getName() + " openMachineSession: " + e.getMessage());
+                logFatalError("node " + vbMachine.getName() + " openMachineSession: " + e.getMessage(), e);
                 return -1;
             }
 
@@ -153,23 +157,23 @@ public final class VirtualBoxControlV42 implements VirtualBoxControl {
 
             releaseSession(session, machine);
             if (0 != result) {
-                log.logFatalError("node " + vbMachine.getName() + " error: " + getVBProcessError(progress));
+                logError("node " + vbMachine.getName() + " error: " + getVBProcessError(progress));
                 return -1;
             }
 
             if (MachineState.Stuck != state) {
-                log.logInfo("node " + vbMachine.getName() + " started");
+                logInfo("node " + vbMachine.getName() + " started");
                 return 0;
             }
             // continue from PoweredOff state
             state = machine.getState(); // update state
         }
 
-        log.logInfo("starting node " + vbMachine.getName() + " from state " + state.toString());
+        logInfo("starting node " + vbMachine.getName() + " from state " + state.toString());
 
         // powerUp from Saved, Aborted or PoweredOff states
         if (snapshot != null) {
-            log.logInfo("Reverting node " + vbMachine.getName() + " to snapshot " + snapshotName);
+            logInfo("Reverting node " + vbMachine.getName() + " to snapshot " + snapshotName);
             session = getSession(machine);
             progress = session.getConsole().restoreSnapshot(snapshot);
             progress.waitForCompletion(-1);
@@ -183,9 +187,9 @@ public final class VirtualBoxControlV42 implements VirtualBoxControl {
         releaseSession(session, machine);
 
         if (0 != result) {
-            log.logFatalError("node " + vbMachine.getName() + " error: " + getVBProcessError(progress));
+            logError("node " + vbMachine.getName() + " error: " + getVBProcessError(progress));
         } else {
-            log.logInfo("node " + vbMachine.getName() + " started");
+            logInfo("node " + vbMachine.getName() + " started");
         }
 
         return result;
@@ -195,13 +199,12 @@ public final class VirtualBoxControlV42 implements VirtualBoxControl {
      * Stops specified VirtualBox virtual machine.
      *
      * @param vbMachine virtual machine to stop
-     * @param log
      * @return result code
      */
-    public synchronized long stopVm(VirtualBoxMachine vbMachine, String snapshotName, String stopMode, VirtualBoxLogger log) {
+    public synchronized long stopVm(VirtualBoxMachine vbMachine, String snapshotName, String stopMode) {
         IMachine machine = vbox.findMachine(vbMachine.getName());
         if (null == machine) {
-            log.logFatalError("Cannot find node: " + vbMachine.getName());
+            logError("Cannot find node: " + vbMachine.getName());
             return -1;
         }
 
@@ -217,25 +220,25 @@ public final class VirtualBoxControlV42 implements VirtualBoxControl {
 
         // wait for transient states to finish
         while (state.value() >= MachineState.FirstTransient.value() && state.value() <= MachineState.LastTransient.value()) {
-            log.logInfo("node " + vbMachine.getName() + " in state " + state.toString());
+            logInfo("node " + vbMachine.getName() + " in state " + state.toString());
             try {
                 Thread.sleep(1000);
             } catch (InterruptedException e) {}
             state = machine.getState();
         }
 
-        log.logInfo("stopping node " + vbMachine.getName() + " from state " + state.toString());
+        logInfo("stopping node " + vbMachine.getName() + " from state " + state.toString());
 
         if (MachineState.Aborted == state || MachineState.PoweredOff == state
                 || MachineState.Saved == state) {
-            log.logInfo("node " + vbMachine.getName() + " stopped");
+            logInfo("node " + vbMachine.getName() + " stopped");
             return 0;
         }
 
         try {
             session = getSession(machine);
         } catch (Exception e) {
-            log.logFatalError("node " + vbMachine.getName() + " openMachineSession: " + e.getMessage());
+            logFatalError("node " + vbMachine.getName() + " openMachineSession: " + e.getMessage(), e);
             return -1;
         }
 
@@ -243,7 +246,7 @@ public final class VirtualBoxControlV42 implements VirtualBoxControl {
             // for Stuck state call powerDown and go to PoweredOff state
             progress = session.getConsole().powerDown();
         } else if (snapshot != null) {
-            log.logInfo("Reverting node " + vbMachine.getName() + " to snapshot " + snapshotName);
+            logInfo("Reverting node " + vbMachine.getName() + " to snapshot " + snapshotName);
             progress = session.getConsole().powerDown();
             progress.waitForCompletion(-1);
 
@@ -262,9 +265,9 @@ public final class VirtualBoxControlV42 implements VirtualBoxControl {
         releaseSession(session, machine);
 
         if (0 != result) {
-            log.logFatalError("node " + vbMachine.getName() + " error: " + getVBProcessError(progress));
+            logError("node " + vbMachine.getName() + " error: " + getVBProcessError(progress));
         } else {
-            log.logInfo("node " + vbMachine.getName() + " stopped");
+            logInfo("node " + vbMachine.getName() + " stopped");
         }
 
         return result;
@@ -276,7 +279,7 @@ public final class VirtualBoxControlV42 implements VirtualBoxControl {
      * @param vbMachine virtual machine
      * @return MAC Address of specified virtual machine
      */
-    public synchronized String getMacAddress(VirtualBoxMachine vbMachine, VirtualBoxLogger log) {
+    public synchronized String getMacAddress(VirtualBoxMachine vbMachine) {
         IMachine machine = vbox.findMachine(vbMachine.getName());
         String macAddress = machine.getNetworkAdapter(0L).getMACAddress();
         return macAddress;

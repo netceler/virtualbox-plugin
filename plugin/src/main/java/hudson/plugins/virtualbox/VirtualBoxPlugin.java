@@ -153,7 +153,7 @@ public class VirtualBoxPlugin extends Plugin {
         VirtualBoxSlave slave = (VirtualBoxSlave) node;
         VirtualBoxMachine vbox = getVirtualBoxMachine(slave.getHostName(), slave.getVirtualMachineName());
 
-        String vboxMacAddress = VirtualBoxUtils.getMacAddress(vbox, new VirtualBoxSystemLog(LOG, "[VirtualBox] "));
+        String vboxMacAddress = VirtualBoxUtils.getMacAddress(vbox);
         LOG.log(Level.INFO, "MacAddress for {0} is {1}", new Object[]{slave.getNodeName(), vboxMacAddress});
 
         if (macAddress.equalsIgnoreCase(vboxMacAddress)) {

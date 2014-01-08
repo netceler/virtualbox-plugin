@@ -55,7 +55,7 @@ public class VirtualBoxCloud extends Cloud {
   }
 
   public synchronized List<VirtualBoxMachine> refreshVirtualMachinesList() {
-    virtualBoxMachines = VirtualBoxUtils.getMachines(this, new VirtualBoxSystemLog(LOG, "[VirtualBox] "));
+    virtualBoxMachines = VirtualBoxUtils.getMachines(this);
     return virtualBoxMachines;
   }
 
@@ -72,7 +72,7 @@ public class VirtualBoxCloud extends Cloud {
   }
 
   public String[] getSnapshots(String virtualMachineName) {
-      return VirtualBoxUtils.getSnapshots(this, virtualMachineName, new VirtualBoxSystemLog(LOG, "[VirtualBox] "));
+      return VirtualBoxUtils.getSnapshots(this, virtualMachineName);
   }
 
   @Extension
@@ -85,7 +85,6 @@ public class VirtualBoxCloud extends Cloud {
     /**
      * For UI.
      */
-    @SuppressWarnings({"UnusedDeclaration", "JavaDoc"})
     public FormValidation doTestConnection(
         @QueryParameter String url,
         @QueryParameter String username,
@@ -93,8 +92,7 @@ public class VirtualBoxCloud extends Cloud {
     ) {
       LOG.log(Level.INFO, "Testing connection to {0} with username {1}", new Object[]{url, username});
       try {
-        VirtualBoxUtils.getMachines(new VirtualBoxCloud("testConnection", url, username, password),
-                new VirtualBoxSystemLog(LOG, "[VirtualBox] "));
+        VirtualBoxUtils.getMachines(new VirtualBoxCloud("testConnection", url, username, password));
         return FormValidation.ok(Messages.VirtualBoxHost_success());
       } catch (Throwable e) {
         return FormValidation.error(e.getMessage());

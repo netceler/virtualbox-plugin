@@ -1,5 +1,7 @@
 package hudson.plugins.virtualbox;
 
+import static hudson.plugins.virtualbox.VirtualBoxLogger.logError;
+import static hudson.plugins.virtualbox.VirtualBoxLogger.logInfo;
 
 import com.sun.xml.ws.commons.virtualbox_3_1.IVirtualBox;
 import com.sun.xml.ws.commons.virtualbox_3_1.IWebsessionManager;
@@ -14,24 +16,28 @@ import java.util.Map;
 public final class VirtualBoxUtils {
 
   // public methods
-  public static long startVm(VirtualBoxMachine machine, String snapshotName, String virtualMachineType, VirtualBoxLogger log) {
-    return getVboxControl(machine.getHost(), log).startVm(machine, snapshotName, virtualMachineType, log);
+  public static long startVm(VirtualBoxMachine machine, String snapshotName, String virtualMachineType) {
+    synchronized (getLock(machine.getName())) {
+      return getVboxControl(machine.getHost()).startVm(machine, snapshotName, virtualMachineType);
+    }
   }
 
-  public static long stopVm(VirtualBoxMachine machine, String snapshotName, String virtualMachineStopMode, VirtualBoxLogger log) {
-    return getVboxControl(machine.getHost(), log).stopVm(machine, snapshotName, virtualMachineStopMode, log);
+  public static long stopVm(VirtualBoxMachine machine, String snapshotName, String virtualMachineStopMode) {
+    synchronized (getLock(machine.getName())) {
+      return getVboxControl(machine.getHost()).stopVm(machine, snapshotName, virtualMachineStopMode);
+    }
   }
 
-  public static List<VirtualBoxMachine> getMachines(VirtualBoxCloud host, VirtualBoxLogger log) {
-    return getVboxControl(host, log).getMachines(host, log);
+  public static List<VirtualBoxMachine> getMachines(VirtualBoxCloud host) {
+    return getVboxControl(host).getMachines(host);
   }
 
-  public static String[] getSnapshots(VirtualBoxCloud host, String virtualMachineName, VirtualBoxSystemLog log) {
-    return getVboxControl(host, log).getSnapshots(virtualMachineName, log);
+  public static String[] getSnapshots(VirtualBoxCloud host, String virtualMachineName) {
+    return getVboxControl(host).getSnapshots(virtualMachineName);
   }
 
-  public static String getMacAddress(VirtualBoxMachine machine, VirtualBoxLogger log) {
-    return getVboxControl(machine.getHost(), log).getMacAddress(machine, log);
+  public static String getMacAddress(VirtualBoxMachine machine) {
+    return getVboxControl(machine.getHost()).getMacAddress(machine);
   }
 
   public static void disconnectAll() {
@@ -51,51 +57,62 @@ public final class VirtualBoxUtils {
    */
   private static HashMap<String, VirtualBoxControl> vboxControls = new HashMap<String, VirtualBoxControl>();
 
-  private static VirtualBoxControl getVboxControl(VirtualBoxCloud host, VirtualBoxLogger log) {
+  private static VirtualBoxControl getVboxControl(VirtualBoxCloud host) {
     VirtualBoxControl vboxControl = vboxControls.get(host.toString());
     if (null != vboxControl) {
       if (vboxControl.isConnected()) {
         return vboxControl;
       }
-      log.logInfo("Lost connection to " + host.getUrl() + ", reconnecting");
+      logInfo("Lost connection to " + host.getUrl() + ", reconnecting");
       vboxControls.remove(host.toString()); // force a reconnect
     }
 
     synchronized (vboxControls) {
-        vboxControl = createVboxControl(host, log);
+        vboxControl = createVboxControl(host);
         vboxControls.put(host.toString(), vboxControl);
     }
 
     return vboxControl;
   }
 
-  private static VirtualBoxControl createVboxControl(VirtualBoxCloud host, VirtualBoxLogger log) {
+  private static VirtualBoxControl createVboxControl(VirtualBoxCloud host) {
     VirtualBoxControl vboxControl = null;
 
-    log.logInfo("Trying to connect to " + host.getUrl() + ", user " + host.getUsername());
+    logInfo("Trying to connect to " + host.getUrl() + ", user " + host.getUsername());
     IWebsessionManager manager = new IWebsessionManager(host.getUrl());
     IVirtualBox vbox = manager.logon(host.getUsername(), host.getPassword());
     String version = vbox.getVersion();
     manager.disconnect(vbox);
 
-    log.logInfo("Creating connection to VirtualBox version " + version);
-      if (version.startsWith("4.3")) {
-       vboxControl = new VirtualBoxControlV43(host.getUrl(), host.getUsername(), host.getPassword());
-      } else if (version.startsWith("4.2")) {
-       vboxControl = new VirtualBoxControlV42(host.getUrl(), host.getUsername(), host.getPassword());
-      } else if (version.startsWith("4.1")) {
-       vboxControl = new VirtualBoxControlV41(host.getUrl(), host.getUsername(), host.getPassword());
-      } else if (version.startsWith("4.0")) {
+    logInfo("Creating connection to VirtualBox version " + version);
+    if (version.startsWith("4.3")) {
+      vboxControl = new VirtualBoxControlV43(host.getUrl(), host.getUsername(), host.getPassword());
+    } else if (version.startsWith("4.2")) {
+      vboxControl = new VirtualBoxControlV42(host.getUrl(), host.getUsername(), host.getPassword());
+    } else if (version.startsWith("4.1")) {
+      vboxControl = new VirtualBoxControlV41(host.getUrl(), host.getUsername(), host.getPassword());
+    } else if (version.startsWith("4.0")) {
       vboxControl = new VirtualBoxControlV40(host.getUrl(), host.getUsername(), host.getPassword());
     } else if (version.startsWith("3.")) {
       vboxControl = new VirtualBoxControlV31(host.getUrl(), host.getUsername(), host.getPassword());
     } else {
-      log.logError("VirtualBox version " + version + " not supported.");
+      logError("VirtualBox version " + version + " not supported.");
       throw new UnsupportedOperationException("VirtualBox version " + version + " not supported.");
     }
 
-    log.logInfo("Connected to VirtualBox version " + version + " on host " + host.getUrl());
+    logInfo("Connected to VirtualBox version " + version + " on host " + host.getUrl());
     return vboxControl;
+  }
+
+  private static Map<String,Object> locks = new HashMap<String,Object>();
+
+  private synchronized static Object getLock(String name) {
+      Object lock = locks.get(name);
+      if (lock == null) {
+          lock = new Object();
+          locks.put(name, lock);
+      }
+      return lock;
   }
 
 }

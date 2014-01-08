@@ -1,9 +1,11 @@
 package hudson.plugins.virtualbox;
 
+import static hudson.plugins.virtualbox.VirtualBoxLogger.logError;
+import static hudson.plugins.virtualbox.VirtualBoxLogger.logFatalError;
+import static hudson.plugins.virtualbox.VirtualBoxLogger.logInfo;
+
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import org.virtualbox_4_3.*;
 
@@ -12,12 +14,11 @@ import org.virtualbox_4_3.*;
  */
 public final class VirtualBoxControlV43 implements VirtualBoxControl {
 
-    private static final Logger LOG = Logger.getLogger(VirtualBoxControlV43.class.getName());
-
     private final VirtualBoxManager manager;
     private final IVirtualBox vbox;
 
     public VirtualBoxControlV43(String hostUrl, String userName, String password) {
+        logInfo("New instance of VirtualBoxControlV43, connecting to manager ...");
         manager = VirtualBoxManager.createInstance(null);
         manager.connect(hostUrl, userName, password);
         vbox = manager.getVBox();
@@ -27,7 +28,7 @@ public final class VirtualBoxControlV43 implements VirtualBoxControl {
         try {
             manager.disconnect();
         } catch (VBoxException e) {
-            LOG.log(Level.WARNING, "Error while disconnecting from manager", e);
+            logFatalError("Error while disconnecting from manager", e);
         }
     }
 
@@ -36,7 +37,7 @@ public final class VirtualBoxControlV43 implements VirtualBoxControl {
             vbox.getVersion();
             return true;
         } catch (VBoxException e) {
-            LOG.log(Level.WARNING, "Error while retrieving VirtualBox version", e);
+            logFatalError("Error while retrieving VirtualBox version", e);
             return false;
         }
     }
@@ -47,7 +48,7 @@ public final class VirtualBoxControlV43 implements VirtualBoxControl {
      * @param host VirtualBox host
      * @return list of virtual machines installed on specified host
      */
-    public List<VirtualBoxMachine> getMachines(VirtualBoxCloud host, VirtualBoxLogger log) {
+    public List<VirtualBoxMachine> getMachines(VirtualBoxCloud host) {
         List<VirtualBoxMachine> result = new ArrayList<VirtualBoxMachine>();
         for (IMachine machine : vbox.getMachines()) {
             result.add(new VirtualBoxMachine(host, machine.getName()));
@@ -55,7 +56,7 @@ public final class VirtualBoxControlV43 implements VirtualBoxControl {
         return result;
     }
 
-    public String[] getSnapshots(String virtualMachineName, VirtualBoxSystemLog log) {
+    public String[] getSnapshots(String virtualMachineName) {
         List<SnapshotData> snapshots = new ArrayList<SnapshotData>();
         for (IMachine machine : vbox.getMachines()) {
             if (virtualMachineName.equals(machine.getName()) && machine.getSnapshotCount() > 0) {
@@ -99,180 +100,191 @@ public final class VirtualBoxControlV43 implements VirtualBoxControl {
      *
      * @param vbMachine virtual machine to start
      * @param type      session type (can be headless, vrdp, gui, sdl)
-     * @param log
      * @return result code
      */
-    public long startVm(VirtualBoxMachine vbMachine, String snapshotName,  String type, VirtualBoxLogger log) {
-        synchronized (vbMachine) {
-            IMachine machine = vbox.findMachine(vbMachine.getName());
-            if (null == machine) {
-                log.logFatalError("Cannot find node: " + vbMachine.getName());
+    public long startVm(VirtualBoxMachine vbMachine, String snapshotName,  String type) {
+        logInfo("Starting machine " + vbMachine.getName() + " ...");
+        IMachine machine = vbox.findMachine(vbMachine.getName());
+        if (null == machine) {
+            logError("Cannot find node: " + vbMachine.getName());
+            return -1;
+        }
+
+        ISnapshot snapshot = null;
+        if (snapshotName != null) {
+            logInfo("Looking for snapshot " + snapshotName + " ...");
+            snapshot = machine.findSnapshot(snapshotName);
+        }
+
+        // states diagram: https://www.virtualbox.org/sdkref/_virtual_box_8idl.html#80b08f71210afe16038e904a656ed9eb
+        logInfo("Checking state of virtual machine " + vbMachine.getName() + " ...");
+        MachineState state = machine.getState();
+        ISession session;
+        IProgress progress;
+
+        // wait for transient states to finish
+        while (state.value() >= MachineState.FirstTransient.value() && state.value() <= MachineState.LastTransient.value()) {
+            logInfo("node " + vbMachine.getName() + " in state " + state.toString() + "(" + state.value() + ")");
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {}
+            state = machine.getState();
+        }
+
+        if (MachineState.Running == state) {
+            logInfo("node " + vbMachine.getName() + " in state " + state.toString());
+            logInfo("node " + vbMachine.getName() + " started");
+            return 0;
+        }
+
+        if (MachineState.Stuck == state || MachineState.Paused == state || MachineState.Aborted == state || MachineState.PoweredOff == state) {
+            logInfo("starting node " + vbMachine.getName() + " from state " + state.toString());
+            try {
+                session = getSession(machine);
+            } catch (Exception e) {
+                logFatalError("node " + vbMachine.getName() + " openMachineSession: " + e.getMessage(), e);
                 return -1;
             }
 
-            ISnapshot snapshot = null;
-            if (snapshotName != null) {
-                snapshot = machine.findSnapshot(snapshotName);
-            }
-
-            // states diagram: https://www.virtualbox.org/sdkref/_virtual_box_8idl.html#80b08f71210afe16038e904a656ed9eb
-            MachineState state = machine.getState();
-            ISession session;
-            IProgress progress;
-
-            // wait for transient states to finish
-            while (state.value() >= MachineState.FirstTransient.value() && state.value() <= MachineState.LastTransient.value()) {
-                log.logInfo("node " + vbMachine.getName() + " in state " + state.toString());
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {}
-                state = machine.getState();
-            }
-
-            if (MachineState.Running == state) {
-                log.logInfo("node " + vbMachine.getName() + " in state " + state.toString());
-                log.logInfo("node " + vbMachine.getName() + " started");
-                return 0;
-            }
-
-            if (MachineState.Stuck == state || MachineState.Paused == state || MachineState.Aborted == state || MachineState.PoweredOff == state) {
-                log.logInfo("starting node " + vbMachine.getName() + " from state " + state.toString());
-                try {
-                    session = getSession(machine);
-                } catch (Exception e) {
-                    log.logFatalError("node " + vbMachine.getName() + " openMachineSession: " + e.getMessage());
-                    return -1;
-                }
-
-                progress = null;
-                if (MachineState.Paused == state) {
-                    // from Paused call resume
-                    session.getConsole().resume();
-                } else if (MachineState.Stuck == state) {
-                    // for Stuck state call powerDown and go to PoweredOff state
-                    progress = session.getConsole().powerDown();
-                    if (snapshot != null) {
-                        progress.waitForCompletion(-1);
-                        log.logInfo("Reverting node " + vbMachine.getName() + " to snapshot " + snapshotName);
-                        progress = session.getConsole().restoreSnapshot(snapshot);
-                    }
-                } else if ((MachineState.Aborted == state || MachineState.PoweredOff == state) && snapshot != null) {
-                    log.logInfo("Reverting node " + vbMachine.getName() + " to snapshot " + snapshotName);
-                    progress = session.getConsole().restoreSnapshot(snapshot);
-                }
-
-                long result = 0; // success
-                if (null != progress) {
+            progress = null;
+            if (MachineState.Paused == state) {
+                // from Paused call resume
+                logInfo("Resuming machine " + vbMachine.getName() + " ...");
+                session.getConsole().resume();
+            } else if (MachineState.Stuck == state) {
+                // for Stuck state call powerDown and go to PoweredOff state
+                logInfo("Powering down machine " + vbMachine.getName() + " ....");
+                progress = session.getConsole().powerDown();
+                logInfo("Waiting for machine " + vbMachine.getName() + " to be powered down ...");
+                if (snapshot != null) {
                     progress.waitForCompletion(-1);
-                    result = progress.getResultCode();
+                    logInfo("Reverting node " + vbMachine.getName() + " to snapshot " + snapshotName);
+                    progress = session.getConsole().restoreSnapshot(snapshot);
+                    logInfo("Waiting for machine " + vbMachine.getName() + " to be reverted ...");
                 }
-
-                releaseSession(session, machine);
-                if (0 != result) {
-                    log.logFatalError("node " + vbMachine.getName() + " error: " + getVBProcessError(progress));
-                    return -1;
-                }
-
-                // continue from PoweredOff state
-                state = machine.getState(); // update state
+            } else if ((MachineState.Aborted == state || MachineState.PoweredOff == state) && snapshot != null) {
+                logInfo("Reverting node " + vbMachine.getName() + " to snapshot " + snapshotName);
+                progress = session.getConsole().restoreSnapshot(snapshot);
+                logInfo("Waiting for machine " + vbMachine.getName() + " to be reverted ...");
             }
 
-            log.logInfo("starting node " + vbMachine.getName() + " from state " + state.toString());
+            long result = 0; // success
+            if (null != progress) {
+                progress.waitForCompletion(-1);
+                result = progress.getResultCode();
+            }
 
-            // powerUp from Saved, Aborted or PoweredOff states
-            session = getSession(null);
-            progress = machine.launchVMProcess(session, type, "");
-            progress.waitForCompletion(-1);
-            long result = progress.getResultCode();
             releaseSession(session, machine);
-
             if (0 != result) {
-                log.logFatalError("node " + vbMachine.getName() + " error: " + getVBProcessError(progress));
-            } else {
-                log.logInfo("node " + vbMachine.getName() + " started");
+                logError("node " + vbMachine.getName() + " error: " + getVBProcessError(progress));
+                return -1;
             }
 
-            return result;
+            // continue from PoweredOff state
+            state = machine.getState(); // update state
         }
+
+        logInfo("starting node " + vbMachine.getName() + " from state " + state.toString());
+
+        // powerUp from Saved, Aborted or PoweredOff states
+        session = getSession(null);
+        logInfo("Launching machine " + vbMachine.getName());
+        progress = machine.launchVMProcess(session, type, "");
+        logInfo("Wiating for machine " + vbMachine.getName() + " to be launched");
+        progress.waitForCompletion(-1);
+        long result = progress.getResultCode();
+        releaseSession(session, machine);
+
+        if (0 != result) {
+            logError("node " + vbMachine.getName() + " error: " + getVBProcessError(progress));
+        } else {
+            logInfo("node " + vbMachine.getName() + " started");
+        }
+
+        return result;
     }
 
     /**
      * Stops specified VirtualBox virtual machine.
      *
      * @param vbMachine virtual machine to stop
-     * @param log
      * @return result code
      */
-    public long stopVm(VirtualBoxMachine vbMachine, String snapshotName, String stopMode, VirtualBoxLogger log) {
-        synchronized (vbMachine) {
-            IMachine machine = vbox.findMachine(vbMachine.getName());
-            if (null == machine) {
-                log.logFatalError("Cannot find node: " + vbMachine.getName());
-                return -1;
-            }
-
-            ISnapshot snapshot = null;
-            if (snapshotName != null) {
-                snapshot = machine.findSnapshot(snapshotName);
-            }
-
-            // states diagram: https://www.virtualbox.org/sdkref/_virtual_box_8idl.html#80b08f71210afe16038e904a656ed9eb
-            MachineState state = machine.getState();
-            ISession session;
-            IProgress progress;
-
-            // wait for transient states to finish
-            while (state.value() >= MachineState.FirstTransient.value() && state.value() <= MachineState.LastTransient.value()) {
-                log.logInfo("node " + vbMachine.getName() + " in state " + state.toString());
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {}
-                state = machine.getState();
-            }
-
-            log.logInfo("stopping node " + vbMachine.getName() + " from state " + state.toString());
-
-            if (MachineState.Aborted == state || MachineState.PoweredOff == state
-                    || MachineState.Saved == state) {
-                log.logInfo("node " + vbMachine.getName() + " stopped");
-                return 0;
-            }
-
-            try {
-                session = getSession(machine);
-            } catch (Exception e) {
-                log.logFatalError("node " + vbMachine.getName() + " openMachineSession: " + e.getMessage());
-                return -1;
-            }
-
-            if (MachineState.Stuck == state || "powerdown".equals(stopMode)) {
-                // for Stuck state call powerDown and go to PoweredOff state
-                progress = session.getConsole().powerDown();
-                if (snapshot != null) {
-                    log.logInfo("Reverting node " + vbMachine.getName() + " to snapshot " + snapshotName);
-                    progress = session.getConsole().powerDown();
-                    progress.waitForCompletion(-1);
-
-                    progress = session.getConsole().restoreSnapshot(snapshot);
-                }
-            } else {
-                // Running or Paused
-                progress = session.getConsole().saveState();
-            }
-
-            progress.waitForCompletion(-1);
-            long result = progress.getResultCode();
-
-            releaseSession(session, machine);
-
-            if (0 != result) {
-                log.logFatalError("node " + vbMachine.getName() + " error: " + getVBProcessError(progress));
-            } else {
-                log.logInfo("node " + vbMachine.getName() + " stopped");
-            }
-
-            return result;
+    public long stopVm(VirtualBoxMachine vbMachine, String snapshotName, String stopMode) {
+        logInfo("Stopping machine " + vbMachine.getName() + " ...");
+        IMachine machine = vbox.findMachine(vbMachine.getName());
+        if (null == machine) {
+            logError("Cannot find node: " + vbMachine.getName());
+            return -1;
         }
+
+        ISnapshot snapshot = null;
+        if (snapshotName != null) {
+            logInfo("Looking for snapshot " + snapshotName + " ...");
+            snapshot = machine.findSnapshot(snapshotName);
+        }
+
+        // states diagram: https://www.virtualbox.org/sdkref/_virtual_box_8idl.html#80b08f71210afe16038e904a656ed9eb
+        logInfo("Checking state of virtual machine " + vbMachine.getName() + " ...");
+        MachineState state = machine.getState();
+        ISession session;
+        IProgress progress;
+
+        // wait for transient states to finish
+        while (state.value() >= MachineState.FirstTransient.value() && state.value() <= MachineState.LastTransient.value()) {
+            logInfo("node " + vbMachine.getName() + " in state " + state.toString() + "(" + state.value() + ")");
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {}
+            state = machine.getState();
+        }
+
+        logInfo("stopping node " + vbMachine.getName() + " from state " + state.toString());
+
+        if (MachineState.Aborted == state || MachineState.PoweredOff == state
+                || MachineState.Saved == state) {
+            logInfo("node " + vbMachine.getName() + " stopped");
+            return 0;
+        }
+
+        try {
+            session = getSession(machine);
+        } catch (Exception e) {
+            logFatalError("node " + vbMachine.getName() + " openMachineSession: " + e.getMessage(), e);
+            return -1;
+        }
+
+        if (MachineState.Stuck == state || "powerdown".equals(stopMode)) {
+            // for Stuck state call powerDown and go to PoweredOff state
+            logInfo("Powering down machine " + vbMachine.getName() + " ....");
+            progress = session.getConsole().powerDown();
+            logInfo("Waiting for machine " + vbMachine.getName() + " to be powered down ...");
+            if (snapshot != null) {
+                progress.waitForCompletion(-1);
+
+                logInfo("Reverting node " + vbMachine.getName() + " to snapshot " + snapshotName);
+                progress = session.getConsole().restoreSnapshot(snapshot);
+                logInfo("Waiting for machine " + vbMachine.getName() + " to be reverted ...");
+            }
+        } else {
+            // Running or Paused
+            logInfo("Saving state of machine " + vbMachine.getName());
+            progress = session.getConsole().saveState();
+            logInfo("Waiting for machine " + vbMachine.getName() + " to be saved");
+        }
+
+        progress.waitForCompletion(-1);
+        long result = progress.getResultCode();
+
+        releaseSession(session, machine);
+
+        if (0 != result) {
+            logError("node " + vbMachine.getName() + " error: " + getVBProcessError(progress));
+        } else {
+            logInfo("node " + vbMachine.getName() + " stopped");
+        }
+
+        return result;
     }
 
     /**
@@ -281,7 +293,7 @@ public final class VirtualBoxControlV43 implements VirtualBoxControl {
      * @param vbMachine virtual machine
      * @return MAC Address of specified virtual machine
      */
-    public String getMacAddress(VirtualBoxMachine vbMachine, VirtualBoxLogger log) {
+    public String getMacAddress(VirtualBoxMachine vbMachine) {
         IMachine machine = vbox.findMachine(vbMachine.getName());
         String macAddress = machine.getNetworkAdapter(0L).getMACAddress();
         return macAddress;
@@ -307,40 +319,54 @@ public final class VirtualBoxControlV43 implements VirtualBoxControl {
     }
 
     private ISession getSession(IMachine machine) {
-        ISession s = manager.getSessionObject();
-        if (null != machine) {
-            machine.lockMachine(s, LockType.Shared);
-            while (isTransientState(machine.getSessionState())) {
-                try {
+        try {
+            logInfo("Getting session" + (machine != null ? " for machine " + machine.getName() : ""));
+            ISession s = manager.getSessionObject();
+            if (null != machine) {
+                logInfo("Locking machine");
+                machine.lockMachine(s, LockType.Shared);
+                logInfo("Waiting for machine transient states ...");
+                while (isTransientState(machine.getSessionState())) {
                     Thread.sleep(500);
-                } catch (InterruptedException e) {}
+                }
             }
-        }
 
-        while (isTransientState(s.getState())) {
-            try {
+            logInfo("Waiting for session transient states ...");
+            while (isTransientState(s.getState())) {
                 Thread.sleep(500);
-            } catch (InterruptedException e) {}
-        }
+            }
 
-        return s;
+            logInfo("Session OK" + (machine != null ? " for machine " + machine.getName() : ""));
+            return s;
+        } catch (InterruptedException e) {
+            logFatalError("Exception while getting session" + (machine != null ? " for machine " + machine.getName() : ""), e);
+            throw new RuntimeException("Unable to retrieve session", e);
+        }
     }
 
     private void releaseSession(ISession s, IMachine machine) {
-        while (isTransientState(machine.getSessionState()) || isTransientState(s.getState())) {
-            try {
-                Thread.sleep(500);
-            } catch (InterruptedException e) {}
-        }
-
         try {
-            s.unlockMachine();
-        } catch (VBoxException e) {}
-
-        while (isTransientState(machine.getSessionState()) || isTransientState(s.getState())) {
-            try {
+            logInfo("Waiting for machine and session transient states ...");
+            while (isTransientState(machine.getSessionState()) || isTransientState(s.getState())) {
                 Thread.sleep(500);
-            } catch (InterruptedException e) {}
+            }
+
+            try {
+                logInfo("Unlocking machine " + machine.getName());
+                s.unlockMachine();
+            } catch (VBoxException e) {
+                logFatalError("Exception while unlocking machine " + machine.getName(), e);
+            }
+
+            logInfo("Waiting for machine and session transient states ...");
+            while (isTransientState(machine.getSessionState()) || isTransientState(s.getState())) {
+                Thread.sleep(500);
+            }
+
+            logInfo("Session released OK for machine " + machine.getName());
+        } catch (InterruptedException e) {
+            logFatalError("Exception while releasing session for machine " + machine.getName(), e);
+            throw new RuntimeException("Unable to release session", e);
         }
     }
 }
