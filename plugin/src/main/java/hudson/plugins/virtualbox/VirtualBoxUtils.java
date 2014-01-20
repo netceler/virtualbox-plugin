@@ -58,21 +58,21 @@ public final class VirtualBoxUtils {
   private static HashMap<String, VirtualBoxControl> vboxControls = new HashMap<String, VirtualBoxControl>();
 
   private static VirtualBoxControl getVboxControl(VirtualBoxCloud host) {
-    VirtualBoxControl vboxControl = vboxControls.get(host.toString());
-    if (null != vboxControl) {
-      if (vboxControl.isConnected()) {
-        return vboxControl;
-      }
-      logInfo("Lost connection to " + host.getUrl() + ", reconnecting");
-      vboxControls.remove(host.toString()); // force a reconnect
-    }
-
     synchronized (vboxControls) {
-        vboxControl = createVboxControl(host);
-        vboxControls.put(host.toString(), vboxControl);
-    }
+      VirtualBoxControl vboxControl = vboxControls.get(host.toString());
+      if (null != vboxControl) {
+        if (vboxControl.isConnected()) {
+          return vboxControl;
+        }
+        logInfo("Lost connection to " + host.getUrl() + ", reconnecting");
+        vboxControls.remove(host.toString()).disconnect(); // force a reconnect
+      }
 
-    return vboxControl;
+      vboxControl = createVboxControl(host);
+      vboxControls.put(host.toString(), vboxControl);
+
+      return vboxControl;
+    }
   }
 
   private static VirtualBoxControl createVboxControl(VirtualBoxCloud host) {

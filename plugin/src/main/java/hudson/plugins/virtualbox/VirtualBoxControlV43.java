@@ -26,6 +26,7 @@ public final class VirtualBoxControlV43 implements VirtualBoxControl {
 
     public void disconnect() {
         try {
+            manager.cleanup();
             manager.disconnect();
         } catch (VBoxException e) {
             logFatalError("Error while disconnecting from manager", e);
@@ -146,35 +147,37 @@ public final class VirtualBoxControlV43 implements VirtualBoxControl {
                 return -1;
             }
 
-            progress = null;
-            if (MachineState.Paused == state) {
-                // from Paused call resume
-                logInfo("Resuming machine " + vbMachine.getName() + " ...");
-                session.getConsole().resume();
-            } else if (MachineState.Stuck == state) {
-                // for Stuck state call powerDown and go to PoweredOff state
-                logInfo("Powering down machine " + vbMachine.getName() + " ....");
-                progress = session.getConsole().powerDown();
-                logInfo("Waiting for machine " + vbMachine.getName() + " to be powered down ...");
-                if (snapshot != null) {
-                    progress.waitForCompletion(-1);
+            long result = 0; // success
+            try {
+                progress = null;
+                if (MachineState.Paused == state) {
+                    // from Paused call resume
+                    logInfo("Resuming machine " + vbMachine.getName() + " ...");
+                    session.getConsole().resume();
+                } else if (MachineState.Stuck == state) {
+                    // for Stuck state call powerDown and go to PoweredOff state
+                    logInfo("Powering down machine " + vbMachine.getName() + " ....");
+                    progress = session.getConsole().powerDown();
+                    logInfo("Waiting for machine " + vbMachine.getName() + " to be powered down ...");
+                    if (snapshot != null) {
+                        progress.waitForCompletion(-1);
+                        logInfo("Reverting node " + vbMachine.getName() + " to snapshot " + snapshotName);
+                        progress = session.getConsole().restoreSnapshot(snapshot);
+                        logInfo("Waiting for machine " + vbMachine.getName() + " to be reverted ...");
+                    }
+                } else if ((MachineState.Aborted == state || MachineState.PoweredOff == state) && snapshot != null) {
                     logInfo("Reverting node " + vbMachine.getName() + " to snapshot " + snapshotName);
                     progress = session.getConsole().restoreSnapshot(snapshot);
                     logInfo("Waiting for machine " + vbMachine.getName() + " to be reverted ...");
                 }
-            } else if ((MachineState.Aborted == state || MachineState.PoweredOff == state) && snapshot != null) {
-                logInfo("Reverting node " + vbMachine.getName() + " to snapshot " + snapshotName);
-                progress = session.getConsole().restoreSnapshot(snapshot);
-                logInfo("Waiting for machine " + vbMachine.getName() + " to be reverted ...");
-            }
 
-            long result = 0; // success
-            if (null != progress) {
-                progress.waitForCompletion(-1);
-                result = progress.getResultCode();
+                if (null != progress) {
+                    progress.waitForCompletion(-1);
+                    result = progress.getResultCode();
+                }
+            } finally {
+                releaseSession(session, machine);
             }
-
-            releaseSession(session, machine);
             if (0 != result) {
                 logError("node " + vbMachine.getName() + " error: " + getVBProcessError(progress));
                 return -1;
@@ -187,13 +190,17 @@ public final class VirtualBoxControlV43 implements VirtualBoxControl {
         logInfo("starting node " + vbMachine.getName() + " from state " + state.toString());
 
         // powerUp from Saved, Aborted or PoweredOff states
+        long result = 0;
         session = getSession(null);
-        logInfo("Launching machine " + vbMachine.getName());
-        progress = machine.launchVMProcess(session, type, "");
-        logInfo("Wiating for machine " + vbMachine.getName() + " to be launched");
-        progress.waitForCompletion(-1);
-        long result = progress.getResultCode();
-        releaseSession(session, machine);
+        try {
+            logInfo("Launching machine " + vbMachine.getName());
+            progress = machine.launchVMProcess(session, type, "");
+            logInfo("Wiating for machine " + vbMachine.getName() + " to be launched");
+            progress.waitForCompletion(-1);
+            result = progress.getResultCode();
+        } finally {
+            releaseSession(session, machine);
+        }
 
         if (0 != result) {
             logError("node " + vbMachine.getName() + " error: " + getVBProcessError(progress));
@@ -254,29 +261,32 @@ public final class VirtualBoxControlV43 implements VirtualBoxControl {
             return -1;
         }
 
-        if (MachineState.Stuck == state || "powerdown".equals(stopMode)) {
-            // for Stuck state call powerDown and go to PoweredOff state
-            logInfo("Powering down machine " + vbMachine.getName() + " ....");
-            progress = session.getConsole().powerDown();
-            logInfo("Waiting for machine " + vbMachine.getName() + " to be powered down ...");
-            if (snapshot != null) {
-                progress.waitForCompletion(-1);
+        long result = 0;
+        try {
+            if (MachineState.Stuck == state || "powerdown".equals(stopMode)) {
+                // for Stuck state call powerDown and go to PoweredOff state
+                logInfo("Powering down machine " + vbMachine.getName() + " ....");
+                progress = session.getConsole().powerDown();
+                logInfo("Waiting for machine " + vbMachine.getName() + " to be powered down ...");
+                if (snapshot != null) {
+                    progress.waitForCompletion(-1);
 
-                logInfo("Reverting node " + vbMachine.getName() + " to snapshot " + snapshotName);
-                progress = session.getConsole().restoreSnapshot(snapshot);
-                logInfo("Waiting for machine " + vbMachine.getName() + " to be reverted ...");
+                    logInfo("Reverting node " + vbMachine.getName() + " to snapshot " + snapshotName);
+                    progress = session.getConsole().restoreSnapshot(snapshot);
+                    logInfo("Waiting for machine " + vbMachine.getName() + " to be reverted ...");
+                }
+            } else {
+                // Running or Paused
+                logInfo("Saving state of machine " + vbMachine.getName());
+                progress = session.getConsole().saveState();
+                logInfo("Waiting for machine " + vbMachine.getName() + " to be saved");
             }
-        } else {
-            // Running or Paused
-            logInfo("Saving state of machine " + vbMachine.getName());
-            progress = session.getConsole().saveState();
-            logInfo("Waiting for machine " + vbMachine.getName() + " to be saved");
+
+            progress.waitForCompletion(-1);
+            result = progress.getResultCode();
+        } finally {
+            releaseSession(session, machine);
         }
-
-        progress.waitForCompletion(-1);
-        long result = progress.getResultCode();
-
-        releaseSession(session, machine);
 
         if (0 != result) {
             logError("node " + vbMachine.getName() + " error: " + getVBProcessError(progress));

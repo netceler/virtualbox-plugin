@@ -38,9 +38,9 @@ public class VirtualBoxPlugin extends Plugin {
   @Override
   public void stop() throws Exception {
     LOG.log(Level.INFO, "Stopping {0}", getClass().getSimpleName());
-    super.stop();
     // close VirtualBox WEB sessions
     VirtualBoxUtils.disconnectAll();
+    super.stop();
   }
 
   /**
