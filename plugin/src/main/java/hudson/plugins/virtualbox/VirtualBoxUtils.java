@@ -16,63 +16,61 @@ import java.util.Map;
 public final class VirtualBoxUtils {
 
   // public methods
-  public static long startVm(VirtualBoxMachine machine, String snapshotName, String virtualMachineType) {
-    synchronized (getLock(machine.getName())) {
-      return getVboxControl(machine.getHost()).startVm(machine, snapshotName, virtualMachineType);
-    }
+  public static long startVm(final VirtualBoxMachine machine, final String snapshotName, final String virtualMachineType) {
+    return executeWithVboxControl(machine.getHost(), new VBoxControlCallback<Long>() {
+      public Long doWithVboxControl(VirtualBoxControl vboxControl) {
+        return vboxControl.startVm(machine, snapshotName, virtualMachineType);
+      }
+    });
   }
 
-  public static long stopVm(VirtualBoxMachine machine, String snapshotName, String virtualMachineStopMode) {
-    synchronized (getLock(machine.getName())) {
-      return getVboxControl(machine.getHost()).stopVm(machine, snapshotName, virtualMachineStopMode);
-    }
+  public static long stopVm(final VirtualBoxMachine machine, final String snapshotName, final String virtualMachineStopMode) {
+    return executeWithVboxControl(machine.getHost(), new VBoxControlCallback<Long>() {
+      public Long doWithVboxControl(VirtualBoxControl vboxControl) {
+        return vboxControl.stopVm(machine, snapshotName, virtualMachineStopMode);
+      }
+    });
   }
 
-  public static List<VirtualBoxMachine> getMachines(VirtualBoxCloud host) {
-    return getVboxControl(host).getMachines(host);
+  public static List<VirtualBoxMachine> getMachines(final VirtualBoxCloud host) {
+    return executeWithVboxControl(host, new VBoxControlCallback<List<VirtualBoxMachine>>() {
+      public List<VirtualBoxMachine> doWithVboxControl(VirtualBoxControl vboxControl) {
+        return vboxControl.getMachines(host);
+      }
+    });
   }
 
-  public static String[] getSnapshots(VirtualBoxCloud host, String virtualMachineName) {
-    return getVboxControl(host).getSnapshots(virtualMachineName);
+  public static String[] getSnapshots(final VirtualBoxCloud host, final String virtualMachineName) {
+    return executeWithVboxControl(host, new VBoxControlCallback<String[]>() {
+      public String[] doWithVboxControl(VirtualBoxControl vboxControl) {
+        return vboxControl.getSnapshots(virtualMachineName);
+      }
+    });
   }
 
-  public static String getMacAddress(VirtualBoxMachine machine) {
-    return getVboxControl(machine.getHost()).getMacAddress(machine);
-  }
-
-  public static void disconnectAll() {
-    for (Map.Entry<String, VirtualBoxControl> entry: vboxControls.entrySet()) {
-      entry.getValue().disconnect();
-    }
-    vboxControls.clear();
+  public static String getMacAddress(final VirtualBoxMachine machine) {
+    return executeWithVboxControl(machine.getHost(), new VBoxControlCallback<String>() {
+      public String doWithVboxControl(VirtualBoxControl vboxControl) {
+        return vboxControl.getMacAddress(machine);
+      }
+    });
   }
 
   // private methods
   private VirtualBoxUtils() {
   }
 
-  /**
-   * Cache connections to VirtualBox hosts
-   * TODO: keep the connections alive with a noop
-   */
-  private static HashMap<String, VirtualBoxControl> vboxControls = new HashMap<String, VirtualBoxControl>();
+  private synchronized static <T> T executeWithVboxControl(VirtualBoxCloud host, VBoxControlCallback<T> vBoxControlCallback) {
+    VirtualBoxControl vboxControl = getVboxControl(host);
+    try {
+      return vBoxControlCallback.doWithVboxControl(vboxControl);
+    } finally {
+      vboxControl.disconnect();
+    }
+  }
 
   private static VirtualBoxControl getVboxControl(VirtualBoxCloud host) {
-    synchronized (vboxControls) {
-      VirtualBoxControl vboxControl = vboxControls.get(host.toString());
-      if (null != vboxControl) {
-        if (vboxControl.isConnected()) {
-          return vboxControl;
-        }
-        logInfo("Lost connection to " + host.getUrl() + ", reconnecting");
-        vboxControls.remove(host.toString()).disconnect(); // force a reconnect
-      }
-
-      vboxControl = createVboxControl(host);
-      vboxControls.put(host.toString(), vboxControl);
-
-      return vboxControl;
-    }
+    return createVboxControl(host);
   }
 
   private static VirtualBoxControl createVboxControl(VirtualBoxCloud host) {
@@ -83,6 +81,7 @@ public final class VirtualBoxUtils {
     IVirtualBox vbox = manager.logon(host.getUsername(), host.getPassword());
     String version = vbox.getVersion();
     manager.disconnect(vbox);
+    manager.cleanupUnused();
 
     logInfo("Creating connection to VirtualBox version " + version);
     if (version.startsWith("4.3")) {
@@ -102,17 +101,6 @@ public final class VirtualBoxUtils {
 
     logInfo("Connected to VirtualBox version " + version + " on host " + host.getUrl());
     return vboxControl;
-  }
-
-  private static Map<String,Object> locks = new HashMap<String,Object>();
-
-  private synchronized static Object getLock(String name) {
-      Object lock = locks.get(name);
-      if (lock == null) {
-          lock = new Object();
-          locks.put(name, lock);
-      }
-      return lock;
   }
 
 }

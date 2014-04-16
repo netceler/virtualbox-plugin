@@ -14,6 +14,7 @@ import org.virtualbox_4_3.*;
  */
 public final class VirtualBoxControlV43 implements VirtualBoxControl {
 
+    private static final int WAIT_FOR_COMPLETION_TIMEOUT = 60000;
     private final VirtualBoxManager manager;
     private final IVirtualBox vbox;
 
@@ -26,8 +27,8 @@ public final class VirtualBoxControlV43 implements VirtualBoxControl {
 
     public void disconnect() {
         try {
-            manager.cleanup();
             manager.disconnect();
+            manager.cleanup();
         } catch (VBoxException e) {
             logFatalError("Error while disconnecting from manager", e);
         }
@@ -103,7 +104,7 @@ public final class VirtualBoxControlV43 implements VirtualBoxControl {
      * @param type      session type (can be headless, vrdp, gui, sdl)
      * @return result code
      */
-    public long startVm(VirtualBoxMachine vbMachine, String snapshotName,  String type) {
+    public synchronized long startVm(VirtualBoxMachine vbMachine, String snapshotName,  String type) {
         logInfo("Starting machine " + vbMachine.getName() + " ...");
         IMachine machine = vbox.findMachine(vbMachine.getName());
         if (null == machine) {
@@ -141,7 +142,7 @@ public final class VirtualBoxControlV43 implements VirtualBoxControl {
         if (MachineState.Stuck == state || MachineState.Paused == state || MachineState.Aborted == state || MachineState.PoweredOff == state) {
             logInfo("starting node " + vbMachine.getName() + " from state " + state.toString());
             try {
-                session = getSession(machine);
+                session = getSession(machine, LockType.Shared);
             } catch (Exception e) {
                 logFatalError("node " + vbMachine.getName() + " openMachineSession: " + e.getMessage(), e);
                 return -1;
@@ -160,19 +161,23 @@ public final class VirtualBoxControlV43 implements VirtualBoxControl {
                     progress = session.getConsole().powerDown();
                     logInfo("Waiting for machine " + vbMachine.getName() + " to be powered down ...");
                     if (snapshot != null) {
-                        progress.waitForCompletion(-1);
+                        progress.waitForCompletion(WAIT_FOR_COMPLETION_TIMEOUT);
+                        releaseSession(session, machine);
+                        session = getSession(machine, LockType.Write);
                         logInfo("Reverting node " + vbMachine.getName() + " to snapshot " + snapshotName);
                         progress = session.getConsole().restoreSnapshot(snapshot);
                         logInfo("Waiting for machine " + vbMachine.getName() + " to be reverted ...");
                     }
                 } else if ((MachineState.Aborted == state || MachineState.PoweredOff == state) && snapshot != null) {
+                    releaseSession(session, machine);
+                    session = getSession(machine, LockType.Write);
                     logInfo("Reverting node " + vbMachine.getName() + " to snapshot " + snapshotName);
                     progress = session.getConsole().restoreSnapshot(snapshot);
                     logInfo("Waiting for machine " + vbMachine.getName() + " to be reverted ...");
                 }
 
                 if (null != progress) {
-                    progress.waitForCompletion(-1);
+                    progress.waitForCompletion(WAIT_FOR_COMPLETION_TIMEOUT);
                     result = progress.getResultCode();
                 }
             } finally {
@@ -191,12 +196,12 @@ public final class VirtualBoxControlV43 implements VirtualBoxControl {
 
         // powerUp from Saved, Aborted or PoweredOff states
         long result = 0;
-        session = getSession(null);
+        session = getSession(null, LockType.VM);
         try {
             logInfo("Launching machine " + vbMachine.getName());
             progress = machine.launchVMProcess(session, type, "");
             logInfo("Wiating for machine " + vbMachine.getName() + " to be launched");
-            progress.waitForCompletion(-1);
+            progress.waitForCompletion(WAIT_FOR_COMPLETION_TIMEOUT);
             result = progress.getResultCode();
         } finally {
             releaseSession(session, machine);
@@ -217,7 +222,7 @@ public final class VirtualBoxControlV43 implements VirtualBoxControl {
      * @param vbMachine virtual machine to stop
      * @return result code
      */
-    public long stopVm(VirtualBoxMachine vbMachine, String snapshotName, String stopMode) {
+    public synchronized long stopVm(VirtualBoxMachine vbMachine, String snapshotName, String stopMode) {
         logInfo("Stopping machine " + vbMachine.getName() + " ...");
         IMachine machine = vbox.findMachine(vbMachine.getName());
         if (null == machine) {
@@ -255,7 +260,7 @@ public final class VirtualBoxControlV43 implements VirtualBoxControl {
         }
 
         try {
-            session = getSession(machine);
+            session = getSession(machine, LockType.Shared);
         } catch (Exception e) {
             logFatalError("node " + vbMachine.getName() + " openMachineSession: " + e.getMessage(), e);
             return -1;
@@ -269,8 +274,10 @@ public final class VirtualBoxControlV43 implements VirtualBoxControl {
                 progress = session.getConsole().powerDown();
                 logInfo("Waiting for machine " + vbMachine.getName() + " to be powered down ...");
                 if (snapshot != null) {
-                    progress.waitForCompletion(-1);
+                    progress.waitForCompletion(WAIT_FOR_COMPLETION_TIMEOUT);
 
+                    releaseSession(session, machine);
+                    session = getSession(machine, LockType.Write);
                     logInfo("Reverting node " + vbMachine.getName() + " to snapshot " + snapshotName);
                     progress = session.getConsole().restoreSnapshot(snapshot);
                     logInfo("Waiting for machine " + vbMachine.getName() + " to be reverted ...");
@@ -282,7 +289,7 @@ public final class VirtualBoxControlV43 implements VirtualBoxControl {
                 logInfo("Waiting for machine " + vbMachine.getName() + " to be saved");
             }
 
-            progress.waitForCompletion(-1);
+            progress.waitForCompletion(WAIT_FOR_COMPLETION_TIMEOUT);
             result = progress.getResultCode();
         } finally {
             releaseSession(session, machine);
@@ -328,13 +335,23 @@ public final class VirtualBoxControlV43 implements VirtualBoxControl {
         return SessionState.Spawning == state || SessionState.Unlocking == state;
     }
 
-    private ISession getSession(IMachine machine) {
+    private ISession getSession(IMachine machine, LockType lockType) {
+        logInfo("Getting session" + (machine != null ? " for machine " + machine.getName() : ""));
+        ISession s = manager.getSessionObject();
         try {
-            logInfo("Getting session" + (machine != null ? " for machine " + machine.getName() : ""));
-            ISession s = manager.getSessionObject();
             if (null != machine) {
-                logInfo("Locking machine");
-                machine.lockMachine(s, LockType.Shared);
+                int nbTry = 0;
+                do {
+                    Thread.sleep(500);
+                    logInfo("Locking machine (session in state: "+s.getState()+")");
+                    try {
+                        machine.lockMachine(s, lockType);
+                    } catch (Exception ex) {
+                        if (!ex.getMessage().contains("is already locked for a session")) {
+                            throw ex;
+                        }
+                    }
+                } while (nbTry++ < 3 && !s.getState().equals(SessionState.Locked));
                 logInfo("Waiting for machine transient states ...");
                 while (isTransientState(machine.getSessionState())) {
                     Thread.sleep(500);
@@ -347,11 +364,11 @@ public final class VirtualBoxControlV43 implements VirtualBoxControl {
             }
 
             logInfo("Session OK" + (machine != null ? " for machine " + machine.getName() : ""));
-            return s;
-        } catch (InterruptedException e) {
+        } catch (Exception e) {
             logFatalError("Exception while getting session" + (machine != null ? " for machine " + machine.getName() : ""), e);
             throw new RuntimeException("Unable to retrieve session", e);
         }
+        return s;
     }
 
     private void releaseSession(ISession s, IMachine machine) {
@@ -362,8 +379,12 @@ public final class VirtualBoxControlV43 implements VirtualBoxControl {
             }
 
             try {
-                logInfo("Unlocking machine " + machine.getName());
-                s.unlockMachine();
+                int nbTry = 0;
+                do {
+                    Thread.sleep(500);
+                    logInfo("Unlocking machine " + machine.getName());
+                    s.unlockMachine();
+                } while (nbTry++ < 3 && !s.getState().equals(SessionState.Unlocked));
             } catch (VBoxException e) {
                 logFatalError("Exception while unlocking machine " + machine.getName(), e);
             }
@@ -374,9 +395,8 @@ public final class VirtualBoxControlV43 implements VirtualBoxControl {
             }
 
             logInfo("Session released OK for machine " + machine.getName());
-        } catch (InterruptedException e) {
+        } catch (Exception e) {
             logFatalError("Exception while releasing session for machine " + machine.getName(), e);
-            throw new RuntimeException("Unable to release session", e);
         }
     }
 }
