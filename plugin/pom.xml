@@ -37,12 +37,18 @@
       <groupId>org.virtualbox</groupId>
       <artifactId>vboxws-42</artifactId>
       <version>4.2.0</version>
-       <scope>provided</scope>
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.virtualbox</groupId>
       <artifactId>vboxws-43</artifactId>
       <version>4.3.30</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.virtualbox</groupId>
+      <artifactId>vboxws-50</artifactId>
+      <version>5.0.6</version>
     </dependency>
   </dependencies>
 

@@ -6,9 +6,7 @@ import static hudson.plugins.virtualbox.VirtualBoxLogger.logInfo;
 import com.sun.xml.ws.commons.virtualbox_3_1.IVirtualBox;
 import com.sun.xml.ws.commons.virtualbox_3_1.IWebsessionManager;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * @author Mihai Serban
@@ -84,7 +82,9 @@ public final class VirtualBoxUtils {
     manager.cleanupUnused();
 
     logInfo("Creating connection to VirtualBox version " + version);
-    if (version.startsWith("4.3")) {
+    if (version.startsWith("5.0")) {
+        vboxControl = new VirtualBoxControlV50(host.getUrl(), host.getUsername(), host.getPassword());
+    } else if (version.startsWith("4.3")) {
       vboxControl = new VirtualBoxControlV43(host.getUrl(), host.getUsername(), host.getPassword());
     } else if (version.startsWith("4.2")) {
       vboxControl = new VirtualBoxControlV42(host.getUrl(), host.getUsername(), host.getPassword());
