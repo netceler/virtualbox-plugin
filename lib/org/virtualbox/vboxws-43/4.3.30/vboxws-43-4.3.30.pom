@@ -4,5 +4,5 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.virtualbox</groupId>
   <artifactId>vboxws-43</artifactId>
-  <version>4.3.6</version>
+  <version>4.3.30</version>
 </project>
