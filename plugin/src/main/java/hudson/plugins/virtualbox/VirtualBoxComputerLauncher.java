@@ -52,8 +52,11 @@ public class VirtualBoxComputerLauncher extends ComputerLauncher {
     lookupVirtualMachineHandle();
   }
 
-  private void lookupVirtualMachineHandle() {
-    virtualMachine = VirtualBoxPlugin.getVirtualBoxMachine(hostName, virtualMachineName);
+  private synchronized VirtualBoxMachine lookupVirtualMachineHandle() {
+    if (virtualMachine == null) {
+      virtualMachine = VirtualBoxPlugin.getVirtualBoxMachine(hostName, virtualMachineName);
+    }
+    return virtualMachine;
   }
 
   @Override
@@ -61,16 +64,15 @@ public class VirtualBoxComputerLauncher extends ComputerLauncher {
     log(listener, "Launching node " + virtualMachineName);
     try {
       // Connect to VirtualBox host
-      if (virtualMachine == null) {
+      if (lookupVirtualMachineHandle() == null) {
         log(listener, "Virtual machine " + virtualMachineName + " not found, retrying ...");
-        lookupVirtualMachineHandle();
-        if (virtualMachine == null) {
+        if (lookupVirtualMachineHandle() == null) {
           log(listener, "Unable to find specified machine (" + virtualMachineName + ") on host " + hostName);
           throw new Exception("Unable to find specified machine (" + virtualMachineName + ") on host " + hostName);
         }
       }
       log(listener, Messages.VirtualBoxLauncher_startVM(virtualMachineName));
-      long result = VirtualBoxUtils.startVm(virtualMachine, snapshotName, virtualMachineType);
+      long result = VirtualBoxUtils.startVm(lookupVirtualMachineHandle(), snapshotName, virtualMachineType);
       if (result != 0) {
         log(listener, "Unable to launch virtual machine " + virtualMachineName + ", giving up :(");
         return;
@@ -126,7 +128,7 @@ public class VirtualBoxComputerLauncher extends ComputerLauncher {
 
     try {
       log(listener, Messages.VirtualBoxLauncher_stopVM(virtualMachineName));
-      long result = VirtualBoxUtils.stopVm(virtualMachine, snapshotName, virtualMachineStopMode);
+      long result = VirtualBoxUtils.stopVm(lookupVirtualMachineHandle(), snapshotName, virtualMachineStopMode);
       if (result != 0) {
         listener.fatalError("Unable to stop");
       }
