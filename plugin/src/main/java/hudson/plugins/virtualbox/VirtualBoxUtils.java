@@ -76,7 +76,7 @@ public final class VirtualBoxUtils {
 
     logInfo("Trying to connect to " + host.getUrl() + ", user " + host.getUsername());
     IWebsessionManager manager = new IWebsessionManager(host.getUrl());
-    IVirtualBox vbox = manager.logon(host.getUsername(), host.getPassword());
+    IVirtualBox vbox = manager.logon(host.getUsername(), host.getPassword().getPlainText());
     String version = vbox.getVersion();
     manager.disconnect(vbox);
     manager.cleanupUnused();

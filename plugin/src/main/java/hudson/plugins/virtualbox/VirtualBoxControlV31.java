@@ -5,6 +5,8 @@ import com.sun.xml.ws.commons.virtualbox_3_1.*;
 import java.util.ArrayList;
 import java.util.List;
 
+import hudson.util.Secret;
+
 /**
  * @author Evgeny Mandrikov
  */
@@ -14,13 +16,13 @@ public final class VirtualBoxControlV31 implements VirtualBoxControl {
   private final String userName;
   private final String password;
 
-  public VirtualBoxControlV31(String hostUrl, String userName, String password) {
+  public VirtualBoxControlV31(String hostUrl, String userName, Secret password) {
     // verify connection
     this.hostUrl = hostUrl;
     this.userName = userName;
-    this.password = password;
+    this.password = password.getPlainText();
 
-    ConnectionHolder holder = connect(hostUrl, userName, password);
+    ConnectionHolder holder = connect(hostUrl, userName, password.getPlainText());
     holder.disconnect();
   }
 

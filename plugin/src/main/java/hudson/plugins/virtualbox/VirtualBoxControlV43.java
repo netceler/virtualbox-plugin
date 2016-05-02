@@ -7,6 +7,8 @@ import static hudson.plugins.virtualbox.VirtualBoxLogger.logInfo;
 import java.util.ArrayList;
 import java.util.List;
 
+import hudson.util.Secret;
+
 import org.virtualbox_4_3.*;
 
 /**
@@ -18,10 +20,10 @@ public final class VirtualBoxControlV43 implements VirtualBoxControl {
     private final VirtualBoxManager manager;
     private final IVirtualBox vbox;
 
-    public VirtualBoxControlV43(String hostUrl, String userName, String password) {
+    public VirtualBoxControlV43(String hostUrl, String userName, Secret password) {
         logInfo("New instance of VirtualBoxControlV43, connecting to manager ...");
         manager = VirtualBoxManager.createInstance(null);
-        manager.connect(hostUrl, userName, password);
+        manager.connect(hostUrl, userName, password.getPlainText());
         vbox = manager.getVBox();
     }
 
@@ -128,7 +130,7 @@ public final class VirtualBoxControlV43 implements VirtualBoxControl {
         while (state.value() >= MachineState.FirstTransient.value() && state.value() <= MachineState.LastTransient.value()) {
             logInfo("node " + vbMachine.getName() + " in state " + state.toString() + "(" + state.value() + ")");
             try {
-                Thread.sleep(1000);
+                wait(1000);
             } catch (InterruptedException e) {}
             state = machine.getState();
         }
@@ -246,7 +248,7 @@ public final class VirtualBoxControlV43 implements VirtualBoxControl {
         while (state.value() >= MachineState.FirstTransient.value() && state.value() <= MachineState.LastTransient.value()) {
             logInfo("node " + vbMachine.getName() + " in state " + state.toString() + "(" + state.value() + ")");
             try {
-                Thread.sleep(1000);
+                wait(1000);
             } catch (InterruptedException e) {}
             state = machine.getState();
         }
@@ -342,7 +344,7 @@ public final class VirtualBoxControlV43 implements VirtualBoxControl {
             if (null != machine) {
                 int nbTry = 0;
                 do {
-                    Thread.sleep(500);
+                    wait(500);
                     logInfo("Locking machine (session in state: "+s.getState()+")");
                     try {
                         machine.lockMachine(s, lockType);
@@ -354,13 +356,13 @@ public final class VirtualBoxControlV43 implements VirtualBoxControl {
                 } while (nbTry++ < 3 && !s.getState().equals(SessionState.Locked));
                 logInfo("Waiting for machine transient states ...");
                 while (isTransientState(machine.getSessionState())) {
-                    Thread.sleep(500);
+                    wait(500);
                 }
             }
 
             logInfo("Waiting for session transient states ...");
             while (isTransientState(s.getState())) {
-                Thread.sleep(500);
+                wait(500);
             }
 
             logInfo("Session OK" + (machine != null ? " for machine " + machine.getName() : ""));
@@ -375,13 +377,13 @@ public final class VirtualBoxControlV43 implements VirtualBoxControl {
         try {
             logInfo("Waiting for machine and session transient states ...");
             while (isTransientState(machine.getSessionState()) || isTransientState(s.getState())) {
-                Thread.sleep(500);
+                wait(500);
             }
 
             try {
                 int nbTry = 0;
                 do {
-                    Thread.sleep(500);
+                    wait(500);
                     logInfo("Unlocking machine " + machine.getName());
                     s.unlockMachine();
                 } while (nbTry++ < 3 && !s.getState().equals(SessionState.Unlocked));
@@ -391,7 +393,7 @@ public final class VirtualBoxControlV43 implements VirtualBoxControl {
 
             logInfo("Waiting for machine and session transient states ...");
             while (isTransientState(machine.getSessionState()) || isTransientState(s.getState())) {
-                Thread.sleep(500);
+                wait(500);
             }
 
             logInfo("Session released OK for machine " + machine.getName());

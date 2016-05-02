@@ -8,6 +8,8 @@ import static hudson.plugins.virtualbox.VirtualBoxLogger.logWarning;
 import java.util.ArrayList;
 import java.util.List;
 
+import hudson.util.Secret;
+
 import org.virtualbox_4_2.*;
 
 /**
@@ -18,9 +20,9 @@ public final class VirtualBoxControlV42 implements VirtualBoxControl {
     private final VirtualBoxManager manager;
     private final IVirtualBox vbox;
 
-    public VirtualBoxControlV42(String hostUrl, String userName, String password) {
+    public VirtualBoxControlV42(String hostUrl, String userName, Secret password) {
         manager = VirtualBoxManager.createInstance(null);
-        manager.connect(hostUrl, userName, password);
+        manager.connect(hostUrl, userName, password.getPlainText());
         vbox = manager.getVBox();
     }
 
@@ -120,7 +122,7 @@ public final class VirtualBoxControlV42 implements VirtualBoxControl {
         while (state.value() >= MachineState.FirstTransient.value() && state.value() <= MachineState.LastTransient.value()) {
             logInfo("node " + vbMachine.getName() + " in state " + state.toString());
             try {
-                Thread.sleep(1000);
+                wait(1000);
             } catch (InterruptedException e) {}
             state = machine.getState();
         }
@@ -222,7 +224,7 @@ public final class VirtualBoxControlV42 implements VirtualBoxControl {
         while (state.value() >= MachineState.FirstTransient.value() && state.value() <= MachineState.LastTransient.value()) {
             logInfo("node " + vbMachine.getName() + " in state " + state.toString());
             try {
-                Thread.sleep(1000);
+                wait(1000);
             } catch (InterruptedException e) {}
             state = machine.getState();
         }
@@ -310,14 +312,14 @@ public final class VirtualBoxControlV42 implements VirtualBoxControl {
             machine.lockMachine(s, LockType.Shared);
             while (isTransientState(machine.getSessionState())) {
                 try {
-                    Thread.sleep(500);
+                    wait(500);
                 } catch (InterruptedException e) {}
             }
         }
 
         while (isTransientState(s.getState())) {
             try {
-                Thread.sleep(500);
+                wait(500);
             } catch (InterruptedException e) {}
         }
 
@@ -327,7 +329,7 @@ public final class VirtualBoxControlV42 implements VirtualBoxControl {
     private void releaseSession(ISession s, IMachine machine) {
         while (isTransientState(machine.getSessionState()) || isTransientState(s.getState())) {
             try {
-                Thread.sleep(500);
+                wait(500);
             } catch (InterruptedException e) {}
         }
 
@@ -337,7 +339,7 @@ public final class VirtualBoxControlV42 implements VirtualBoxControl {
 
         while (isTransientState(machine.getSessionState()) || isTransientState(s.getState())) {
             try {
-                Thread.sleep(500);
+                wait(500);
             } catch (InterruptedException e) {}
         }
     }

@@ -8,6 +8,7 @@ import hudson.slaves.Cloud;
 import hudson.slaves.NodeProvisioner;
 import hudson.util.FormValidation;
 import hudson.util.Scrambler;
+import hudson.util.Secret;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -29,7 +30,7 @@ public class VirtualBoxCloud extends Cloud {
 
   private final String url;
   private final String username;
-  private final String password;
+  private final Secret password;
 
   /**
    * Lazily computed list of virtual machines from this host.
@@ -37,11 +38,11 @@ public class VirtualBoxCloud extends Cloud {
   private transient List<VirtualBoxMachine> virtualBoxMachines = null;
 
   @DataBoundConstructor
-  public VirtualBoxCloud(String displayName, String url, String username, String password) {
+  public VirtualBoxCloud(String displayName, String url, String username, Secret password) {
     super(displayName);
     this.url = url;
     this.username = username;
-    this.password = Scrambler.scramble(Util.fixEmptyAndTrim(password));
+    this.password = password;
   }
 
   @Override
@@ -88,7 +89,7 @@ public class VirtualBoxCloud extends Cloud {
     public FormValidation doTestConnection(
         @QueryParameter String url,
         @QueryParameter String username,
-        @QueryParameter String password
+        @QueryParameter Secret password
     ) {
       LOG.log(Level.INFO, "Testing connection to {0} with username {1}", new Object[]{url, username});
       try {
@@ -108,8 +109,8 @@ public class VirtualBoxCloud extends Cloud {
     return username;
   }
 
-  public String getPassword() {
-    return Scrambler.descramble(password);
+  public Secret getPassword() {
+    return password;
   }
 
   @Override

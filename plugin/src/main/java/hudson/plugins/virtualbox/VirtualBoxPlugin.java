@@ -1,11 +1,11 @@
 package hudson.plugins.virtualbox;
 
 import hudson.Plugin;
-import hudson.model.Hudson;
 import hudson.model.Node;
 import hudson.slaves.Cloud;
 import hudson.util.FormValidation;
 import hudson.util.ListBoxModel;
+import jenkins.model.Jenkins;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -47,7 +47,11 @@ public class VirtualBoxPlugin extends Plugin {
    */
   public static List<VirtualBoxCloud> getHosts() {
     List<VirtualBoxCloud> result = new ArrayList<VirtualBoxCloud>();
-    for (Cloud cloud : Hudson.getInstance().clouds) {
+    Jenkins jenkins = Jenkins.getInstance();
+    if (jenkins == null) {
+      return result;
+    }
+    for (Cloud cloud : jenkins.clouds) {
       if (cloud instanceof VirtualBoxCloud) {
         result.add((VirtualBoxCloud) cloud);
       }
@@ -147,7 +151,11 @@ public class VirtualBoxPlugin extends Plugin {
   public void doGetSlaveAgent(StaplerRequest req, StaplerResponse resp, @QueryParameter("macAddress") String macAddress)
       throws IOException {
     LOG.log(Level.INFO, "Searching VirtualBox machine with MacAddress {0}", macAddress);
-    for (Node node : Hudson.getInstance().getNodes()) {
+    Jenkins jenkins = Jenkins.getInstance();
+    if (jenkins == null) {
+      return;
+    }
+    for (Node node : jenkins.getNodes()) {
       if (node instanceof VirtualBoxSlave) {
         VirtualBoxSlave slave = (VirtualBoxSlave) node;
         VirtualBoxMachine vbox = getVirtualBoxMachine(slave.getHostName(), slave.getVirtualMachineName());
@@ -156,7 +164,7 @@ public class VirtualBoxPlugin extends Plugin {
         LOG.log(Level.INFO, "MacAddress for {0} is {1}", new Object[]{slave.getNodeName(), vboxMacAddress});
 
         if (macAddress.equalsIgnoreCase(vboxMacAddress)) {
-          String url = Hudson.getInstance().getRootUrl() + "/computer/" + slave.getNodeName() + "/slave-agent.jnlp";
+          String url = jenkins.getRootUrl() + "/computer/" + slave.getNodeName() + "/slave-agent.jnlp";
           LOG.log(Level.INFO, "Found {0} for Mac Address {1}, sending redirect to {2}", new Object[]{slave, macAddress, url});
           resp.sendRedirect(url);
           return;

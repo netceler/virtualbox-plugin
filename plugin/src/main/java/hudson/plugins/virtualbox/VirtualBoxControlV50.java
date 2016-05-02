@@ -7,6 +7,9 @@ import static hudson.plugins.virtualbox.VirtualBoxLogger.logInfo;
 import java.util.ArrayList;
 import java.util.List;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import hudson.util.Secret;
+
 import org.virtualbox_5_0.*;
 
 /**
@@ -15,30 +18,34 @@ import org.virtualbox_5_0.*;
 public final class VirtualBoxControlV50 implements VirtualBoxControl {
 
     private static final int WAIT_FOR_COMPLETION_TIMEOUT = 60000;
+
     private final VirtualBoxManager manager;
+
     private final IVirtualBox vbox;
 
-    public VirtualBoxControlV50(String hostUrl, String userName, String password) {
+    public VirtualBoxControlV50(final String hostUrl, final String userName, final Secret password) {
         logInfo("New instance of VirtualBoxControlV43, connecting to manager ...");
         manager = VirtualBoxManager.createInstance(null);
-        manager.connect(hostUrl, userName, password);
+        manager.connect(hostUrl, userName, password.getPlainText());
         vbox = manager.getVBox();
     }
 
+    @Override
     public void disconnect() {
         try {
             manager.disconnect();
             manager.cleanup();
-        } catch (VBoxException e) {
+        } catch (final VBoxException e) {
             logFatalError("Error while disconnecting from manager", e);
         }
     }
 
+    @Override
     public boolean isConnected() {
         try {
             vbox.getVersion();
             return true;
-        } catch (VBoxException e) {
+        } catch (final VBoxException e) {
             logFatalError("Error while retrieving VirtualBox version", e);
             return false;
         }
@@ -46,34 +53,35 @@ public final class VirtualBoxControlV50 implements VirtualBoxControl {
 
     /**
      * Get virtual machines installed on specified host.
-     *
      * @param host VirtualBox host
      * @return list of virtual machines installed on specified host
      */
-    public List<VirtualBoxMachine> getMachines(VirtualBoxCloud host) {
-        List<VirtualBoxMachine> result = new ArrayList<VirtualBoxMachine>();
-        for (IMachine machine : vbox.getMachines()) {
+    @Override
+    public List<VirtualBoxMachine> getMachines(final VirtualBoxCloud host) {
+        final List<VirtualBoxMachine> result = new ArrayList<VirtualBoxMachine>();
+        for (final IMachine machine : vbox.getMachines()) {
             result.add(new VirtualBoxMachine(host, machine.getName()));
         }
         return result;
     }
 
-    public String[] getSnapshots(String virtualMachineName) {
-        List<SnapshotData> snapshots = new ArrayList<SnapshotData>();
-        for (IMachine machine : vbox.getMachines()) {
+    @Override
+    public String[] getSnapshots(final String virtualMachineName) {
+        final List<SnapshotData> snapshots = new ArrayList<SnapshotData>();
+        for (final IMachine machine : vbox.getMachines()) {
             if (virtualMachineName.equals(machine.getName()) && machine.getSnapshotCount() > 0) {
-                ISnapshot root = findRootSnapshot(machine);
+                final ISnapshot root = findRootSnapshot(machine);
                 fillSnapshot(snapshots, root);
             }
         }
-        String[] snapshotNames = new String[snapshots.size()];
-        for (int i = 0 ; i < snapshots.size() ; i++) {
+        final String[] snapshotNames = new String[snapshots.size()];
+        for (int i = 0; i < snapshots.size(); i++) {
             snapshotNames[i] = snapshots.get(i).name;
         }
         return snapshotNames;
     }
 
-    private static ISnapshot findRootSnapshot(IMachine machine) {
+    private static ISnapshot findRootSnapshot(final IMachine machine) {
         ISnapshot root = machine.getCurrentSnapshot();
         while (root.getParent() != null) {
             root = root.getParent();
@@ -81,14 +89,14 @@ public final class VirtualBoxControlV50 implements VirtualBoxControl {
         return root;
     }
 
-    private List<SnapshotData> fillSnapshot(List<SnapshotData> snapshotList, ISnapshot snapshot) {
+    private List<SnapshotData> fillSnapshot(List<SnapshotData> snapshotList, final ISnapshot snapshot) {
         if (snapshot != null) {
-            SnapshotData snapshotData = new SnapshotData();
+            final SnapshotData snapshotData = new SnapshotData();
             snapshotData.name = snapshot.getName();
             snapshotData.id = snapshot.getId();
             snapshotList.add(snapshotData);
             if (snapshot.getChildren() != null) {
-                for (ISnapshot child : snapshot.getChildren()) {
+                for (final ISnapshot child : snapshot.getChildren()) {
                     // call fillSnapshot recursive
                     snapshotList = fillSnapshot(snapshotList, child);
                 }
@@ -99,14 +107,15 @@ public final class VirtualBoxControlV50 implements VirtualBoxControl {
 
     /**
      * Starts specified VirtualBox virtual machine.
-     *
      * @param vbMachine virtual machine to start
-     * @param type      session type (can be headless, vrdp, gui, sdl)
+     * @param type session type (can be headless, vrdp, gui, sdl)
      * @return result code
      */
-    public synchronized long startVm(VirtualBoxMachine vbMachine, String snapshotName,  String type) {
+    @Override
+    public synchronized long startVm(final VirtualBoxMachine vbMachine, final String snapshotName,
+            final String type) {
         logInfo("Starting machine " + vbMachine.getName() + " ...");
-        IMachine machine = vbox.findMachine(vbMachine.getName());
+        final IMachine machine = vbox.findMachine(vbMachine.getName());
         if (null == machine) {
             logError("Cannot find node: " + vbMachine.getName());
             return -1;
@@ -118,18 +127,22 @@ public final class VirtualBoxControlV50 implements VirtualBoxControl {
             snapshot = machine.findSnapshot(snapshotName);
         }
 
-        // states diagram: https://www.virtualbox.org/sdkref/_virtual_box_8idl.html#80b08f71210afe16038e904a656ed9eb
+        // states diagram:
+        // https://www.virtualbox.org/sdkref/_virtual_box_8idl.html#80b08f71210afe16038e904a656ed9eb
         logInfo("Checking state of virtual machine " + vbMachine.getName() + " ...");
         MachineState state = machine.getState();
         ISession session;
         IProgress progress;
 
         // wait for transient states to finish
-        while (state.value() >= MachineState.FirstTransient.value() && state.value() <= MachineState.LastTransient.value()) {
-            logInfo("node " + vbMachine.getName() + " in state " + state.toString() + "(" + state.value() + ")");
+        while (state.value() >= MachineState.FirstTransient.value()
+                && state.value() <= MachineState.LastTransient.value()) {
+            logInfo("node " + vbMachine.getName() + " in state " + state.toString() + "(" + state.value()
+                    + ")");
             try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {}
+                wait(1000);
+            } catch (final InterruptedException e) {
+            }
             state = machine.getState();
         }
 
@@ -139,11 +152,12 @@ public final class VirtualBoxControlV50 implements VirtualBoxControl {
             return 0;
         }
 
-        if (MachineState.Stuck == state || MachineState.Paused == state || MachineState.Aborted == state || MachineState.PoweredOff == state) {
+        if (MachineState.Stuck == state || MachineState.Paused == state || MachineState.Aborted == state
+                || MachineState.PoweredOff == state) {
             logInfo("starting node " + vbMachine.getName() + " from state " + state.toString());
             try {
                 session = getSession(machine, LockType.Shared);
-            } catch (Exception e) {
+            } catch (final Exception e) {
                 logFatalError("node " + vbMachine.getName() + " openMachineSession: " + e.getMessage(), e);
                 return -1;
             }
@@ -168,7 +182,8 @@ public final class VirtualBoxControlV50 implements VirtualBoxControl {
                         progress = session.getMachine().restoreSnapshot(snapshot);
                         logInfo("Waiting for machine " + vbMachine.getName() + " to be reverted ...");
                     }
-                } else if ((MachineState.Aborted == state || MachineState.PoweredOff == state) && snapshot != null) {
+                } else if ((MachineState.Aborted == state || MachineState.PoweredOff == state)
+                        && snapshot != null) {
                     releaseSession(session, machine);
                     session = getSession(machine, LockType.Write);
                     logInfo("Reverting node " + vbMachine.getName() + " to snapshot " + snapshotName);
@@ -218,13 +233,14 @@ public final class VirtualBoxControlV50 implements VirtualBoxControl {
 
     /**
      * Stops specified VirtualBox virtual machine.
-     *
      * @param vbMachine virtual machine to stop
      * @return result code
      */
-    public synchronized long stopVm(VirtualBoxMachine vbMachine, String snapshotName, String stopMode) {
+    @Override
+    public synchronized long stopVm(final VirtualBoxMachine vbMachine, final String snapshotName,
+            final String stopMode) {
         logInfo("Stopping machine " + vbMachine.getName() + " ...");
-        IMachine machine = vbox.findMachine(vbMachine.getName());
+        final IMachine machine = vbox.findMachine(vbMachine.getName());
         if (null == machine) {
             logError("Cannot find node: " + vbMachine.getName());
             return -1;
@@ -236,18 +252,22 @@ public final class VirtualBoxControlV50 implements VirtualBoxControl {
             snapshot = machine.findSnapshot(snapshotName);
         }
 
-        // states diagram: https://www.virtualbox.org/sdkref/_virtual_box_8idl.html#80b08f71210afe16038e904a656ed9eb
+        // states diagram:
+        // https://www.virtualbox.org/sdkref/_virtual_box_8idl.html#80b08f71210afe16038e904a656ed9eb
         logInfo("Checking state of virtual machine " + vbMachine.getName() + " ...");
         MachineState state = machine.getState();
         ISession session;
         IProgress progress;
 
         // wait for transient states to finish
-        while (state.value() >= MachineState.FirstTransient.value() && state.value() <= MachineState.LastTransient.value()) {
-            logInfo("node " + vbMachine.getName() + " in state " + state.toString() + "(" + state.value() + ")");
+        while (state.value() >= MachineState.FirstTransient.value()
+                && state.value() <= MachineState.LastTransient.value()) {
+            logInfo("node " + vbMachine.getName() + " in state " + state.toString() + "(" + state.value()
+                    + ")");
             try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {}
+                wait(1000);
+            } catch (final InterruptedException e) {
+            }
             state = machine.getState();
         }
 
@@ -261,7 +281,7 @@ public final class VirtualBoxControlV50 implements VirtualBoxControl {
 
         try {
             session = getSession(machine, LockType.Shared);
-        } catch (Exception e) {
+        } catch (final Exception e) {
             logFatalError("node " + vbMachine.getName() + " openMachineSession: " + e.getMessage(), e);
             return -1;
         }
@@ -306,22 +326,22 @@ public final class VirtualBoxControlV50 implements VirtualBoxControl {
 
     /**
      * MAC Address of specified virtual machine.
-     *
      * @param vbMachine virtual machine
      * @return MAC Address of specified virtual machine
      */
-    public String getMacAddress(VirtualBoxMachine vbMachine) {
-        IMachine machine = vbox.findMachine(vbMachine.getName());
-        String macAddress = machine.getNetworkAdapter(0L).getMACAddress();
+    @Override
+    public String getMacAddress(final VirtualBoxMachine vbMachine) {
+        final IMachine machine = vbox.findMachine(vbMachine.getName());
+        final String macAddress = machine.getNetworkAdapter(0L).getMACAddress();
         return macAddress;
     }
 
-    private String getVBProcessError(IProgress progress) {
+    private String getVBProcessError(final IProgress progress) {
         if (0 == progress.getResultCode()) {
             return "";
         }
 
-        StringBuilder sb = new StringBuilder("");
+        final StringBuilder sb = new StringBuilder("");
         IVirtualBoxErrorInfo errInfo = progress.getErrorInfo();
         while (null != errInfo) {
             sb.append(errInfo.getText());
@@ -331,22 +351,22 @@ public final class VirtualBoxControlV50 implements VirtualBoxControl {
         return sb.toString();
     }
 
-    private boolean isTransientState(SessionState state) {
+    private boolean isTransientState(final SessionState state) {
         return SessionState.Spawning == state || SessionState.Unlocking == state;
     }
 
-    private ISession getSession(IMachine machine, LockType lockType) {
+    private ISession getSession(final IMachine machine, final LockType lockType) {
         logInfo("Getting session" + (machine != null ? " for machine " + machine.getName() : ""));
-        ISession s = manager.getSessionObject();
+        final ISession s = manager.getSessionObject();
         try {
             if (null != machine) {
                 int nbTry = 0;
                 do {
-                    Thread.sleep(500);
-                    logInfo("Locking machine (session in state: "+s.getState()+")");
+                    wait(500);
+                    logInfo("Locking machine (session in state: " + s.getState() + ")");
                     try {
                         machine.lockMachine(s, lockType);
-                    } catch (Exception ex) {
+                    } catch (final Exception ex) {
                         if (!ex.getMessage().contains("is already locked for a session")) {
                             throw ex;
                         }
@@ -354,48 +374,49 @@ public final class VirtualBoxControlV50 implements VirtualBoxControl {
                 } while (nbTry++ < 3 && !s.getState().equals(SessionState.Locked));
                 logInfo("Waiting for machine transient states ...");
                 while (isTransientState(machine.getSessionState())) {
-                    Thread.sleep(500);
+                    wait(500);
                 }
             }
 
             logInfo("Waiting for session transient states ...");
             while (isTransientState(s.getState())) {
-                Thread.sleep(500);
+                wait(500);
             }
 
             logInfo("Session OK" + (machine != null ? " for machine " + machine.getName() : ""));
-        } catch (Exception e) {
-            logFatalError("Exception while getting session" + (machine != null ? " for machine " + machine.getName() : ""), e);
+        } catch (final Exception e) {
+            logFatalError("Exception while getting session"
+                    + (machine != null ? " for machine " + machine.getName() : ""), e);
             throw new RuntimeException("Unable to retrieve session", e);
         }
         return s;
     }
 
-    private void releaseSession(ISession s, IMachine machine) {
+    private void releaseSession(final ISession s, final IMachine machine) {
         try {
             logInfo("Waiting for machine and session transient states ...");
             while (isTransientState(machine.getSessionState()) || isTransientState(s.getState())) {
-                Thread.sleep(500);
+                wait(500);
             }
 
             try {
                 int nbTry = 0;
                 do {
-                    Thread.sleep(500);
+                    wait(500);
                     logInfo("Unlocking machine " + machine.getName());
                     s.unlockMachine();
                 } while (nbTry++ < 3 && !s.getState().equals(SessionState.Unlocked));
-            } catch (VBoxException e) {
+            } catch (final VBoxException e) {
                 logFatalError("Exception while unlocking machine " + machine.getName(), e);
             }
 
             logInfo("Waiting for machine and session transient states ...");
             while (isTransientState(machine.getSessionState()) || isTransientState(s.getState())) {
-                Thread.sleep(500);
+                wait(500);
             }
 
             logInfo("Session released OK for machine " + machine.getName());
-        } catch (Exception e) {
+        } catch (final Exception e) {
             logFatalError("Exception while releasing session for machine " + machine.getName(), e);
         }
     }
