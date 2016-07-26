@@ -124,7 +124,9 @@ public final class VirtualBoxControlV50 implements VirtualBoxControl {
         ISnapshot snapshot = null;
         if (snapshotName != null) {
             logInfo("Looking for snapshot " + snapshotName + " ...");
-            snapshot = machine.findSnapshot(snapshotName);
+            try {
+                snapshot = machine.findSnapshot(snapshotName);
+            } catch (Exception e) {}
         }
 
         // states diagram:
