@@ -1,5 +1,10 @@
 target
 work
+lib/**/*.md5
+lib/**/*.sha1
+lib/**/maven-metadata*
+lib/**/*.lastUpdated
+lib/**/m2e*
 
 # IntelliJ IDEA project files
 *.iml

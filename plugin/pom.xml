@@ -24,31 +24,31 @@
     <dependency>
       <groupId>org.virtualbox</groupId>
       <artifactId>vboxws-40</artifactId>
-      <version>4.0.8</version>
+      <version>4.0.36</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.virtualbox</groupId>
       <artifactId>vboxws-41</artifactId>
-      <version>4.1.8</version>
+      <version>4.1.44</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.virtualbox</groupId>
       <artifactId>vboxws-42</artifactId>
-      <version>4.2.0</version>
+      <version>4.2.36</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.virtualbox</groupId>
       <artifactId>vboxws-43</artifactId>
-      <version>4.3.30</version>
+      <version>4.3.40</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.virtualbox</groupId>
       <artifactId>vboxws-50</artifactId>
-      <version>5.0.6</version>
+      <version>5.0.28</version>
     </dependency>
   </dependencies>
 
