@@ -218,7 +218,7 @@ public class VirtualBoxSlave extends Slave {
    * @return original launcher
    */
   public ComputerLauncher getDelegateLauncher() {
-    return getLauncher().getCore();
+    return getLauncher().getLauncher();
   }
 
   @Extension

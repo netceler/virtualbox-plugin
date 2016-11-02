@@ -8,9 +8,11 @@ import org.kohsuke.stapler.DataBoundConstructor;
 import hudson.model.Descriptor;
 import hudson.model.TaskListener;
 import hudson.slaves.ComputerLauncher;
+import hudson.slaves.DelegatingComputerLauncher;
 import hudson.slaves.SlaveComputer;
 
 import java.io.IOException;
+import java.io.ObjectStreamException;
 
 /**
  * {@link ComputerLauncher} for VirtualBox that waits for the instance to really come up before processing to
@@ -21,11 +23,12 @@ import java.io.IOException;
  *
  * @author Evgeny Mandrikov
  */
-public class VirtualBoxComputerLauncher extends ComputerLauncher {
+public class VirtualBoxComputerLauncher extends DelegatingComputerLauncher {
 
   private transient VirtualBoxMachine virtualMachine;
 
-  private ComputerLauncher delegate;
+  @Deprecated
+  private transient ComputerLauncher delegate;
 
   private String hostName;
 
@@ -40,9 +43,9 @@ public class VirtualBoxComputerLauncher extends ComputerLauncher {
   private int startupWaitingPeriodSeconds;
 
   @DataBoundConstructor
-  public VirtualBoxComputerLauncher(ComputerLauncher delegate, String hostName, String virtualMachineName,
+  public VirtualBoxComputerLauncher(ComputerLauncher launcher, String hostName, String virtualMachineName,
       String snapshotName, String virtualMachineType, String virtualMachineStopMode, int startupWaitingPeriodSeconds) {
-    this.delegate = delegate;
+    super(launcher);
     this.hostName = hostName;
     this.virtualMachineName = virtualMachineName;
     this.snapshotName = snapshotName;
@@ -50,6 +53,19 @@ public class VirtualBoxComputerLauncher extends ComputerLauncher {
     this.virtualMachineStopMode = virtualMachineStopMode;
     this.startupWaitingPeriodSeconds = startupWaitingPeriodSeconds;
     lookupVirtualMachineHandle();
+  }
+
+  /**
+   * Migrates instances from the old parent class to the new parent class.
+   * @return the deserialized instance.
+   * @throws ObjectStreamException if something went wrong.
+   */
+  private Object readResolve() throws ObjectStreamException {
+    if (delegate != null) {
+      return new VirtualBoxComputerLauncher(delegate, hostName, virtualMachineName, snapshotName, virtualMachineType,
+              virtualMachineStopMode, startupWaitingPeriodSeconds);
+    }
+    return this;
   }
 
   private synchronized VirtualBoxMachine lookupVirtualMachineHandle() {
@@ -99,8 +115,8 @@ public class VirtualBoxComputerLauncher extends ComputerLauncher {
    */
   protected boolean delegateLaunch(SlaveComputer computer, TaskListener listener) {
     try {
-      log(listener, "Starting stage 2 launcher (" + delegate.getClass().getSimpleName() + ")");
-      getCore().launch(computer, listener);
+      log(listener, "Starting stage 2 launcher (" + getLauncher().getClass().getSimpleName() + ")");
+      super.launch(computer, listener);
       log(listener, "Stage 2 launcher completed");
       return computer.isOnline();
     } catch (IOException e) {
@@ -113,17 +129,10 @@ public class VirtualBoxComputerLauncher extends ComputerLauncher {
   }
 
   @Override
-  public void beforeDisconnect(SlaveComputer computer, TaskListener listener) {
-    log(listener, "Starting stage 2 beforeDisconnect");
-    getCore().beforeDisconnect(computer, listener);
-    log(listener, "Stage 2 beforeDisconnect completed");
-  }
-
-  @Override
   public void afterDisconnect(SlaveComputer computer, TaskListener listener) {
     // Stage 2 of the afterDisconnect
     log(listener, "Starting stage 2 afterDisconnect");
-    getCore().afterDisconnect(computer, listener);
+    super.afterDisconnect(computer, listener);
     log(listener, "Stage 2 afterDisconnect completed");
 
     try {
@@ -135,13 +144,6 @@ public class VirtualBoxComputerLauncher extends ComputerLauncher {
     } catch (Throwable e) {
       log(listener, "Unable to stop virtual machine " + virtualMachineName, e);
     }
-  }
-
-  /**
-   * @return delegation target
-   */
-  public ComputerLauncher getCore() {
-    return delegate;
   }
 
   @Override
