@@ -207,18 +207,13 @@ public class VirtualBoxSlave extends Slave {
     return revertAfterBuild;
   }
 
-  @Override
-  public VirtualBoxComputerLauncher getLauncher() {
-    return (VirtualBoxComputerLauncher) super.getLauncher();
-  }
-
   /**
    * For UI.
    *
    * @return original launcher
    */
   public ComputerLauncher getDelegateLauncher() {
-    return getLauncher().getLauncher();
+      return ((VirtualBoxComputerLauncher) getLauncher()).getLauncher();
   }
 
   @Extension
