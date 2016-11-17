@@ -10,12 +10,12 @@ import java.util.List;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import hudson.util.Secret;
 
-import org.virtualbox_5_0.*;
+import org.virtualbox_5_1.*;
 
 /**
  * @author Mihai Serban
  */
-public final class VirtualBoxControlV50 implements VirtualBoxControl {
+public final class VirtualBoxControlV51 implements VirtualBoxControl {
 
     private static final int WAIT_FOR_COMPLETION_TIMEOUT = 60000;
 
@@ -23,8 +23,8 @@ public final class VirtualBoxControlV50 implements VirtualBoxControl {
 
     private final IVirtualBox vbox;
 
-    public VirtualBoxControlV50(final String hostUrl, final String userName, final Secret password) {
-        logInfo("New instance of VirtualBoxControlV50, connecting to manager ...");
+    public VirtualBoxControlV51(final String hostUrl, final String userName, final Secret password) {
+        logInfo("New instance of VirtualBoxControlV51, connecting to manager ...");
         manager = VirtualBoxManager.createInstance(null);
         manager.connect(hostUrl, userName, password.getPlainText());
         vbox = manager.getVBox();
