@@ -3,9 +3,6 @@ package hudson.plugins.virtualbox;
 import static hudson.plugins.virtualbox.VirtualBoxLogger.logError;
 import static hudson.plugins.virtualbox.VirtualBoxLogger.logInfo;
 
-import com.sun.xml.ws.commons.virtualbox_3_1.IVirtualBox;
-import com.sun.xml.ws.commons.virtualbox_3_1.IWebsessionManager;
-
 import java.util.List;
 
 /**
@@ -75,17 +72,26 @@ public final class VirtualBoxUtils {
     VirtualBoxControl vboxControl = null;
 
     logInfo("Trying to connect to " + host.getUrl() + ", user " + host.getUsername());
-    IWebsessionManager manager = new IWebsessionManager(host.getUrl());
-    IVirtualBox vbox = manager.logon(host.getUsername(), host.getPassword().getPlainText());
-    String version = vbox.getVersion();
-    manager.disconnect(vbox);
-    manager.cleanupUnused();
+    String version = null;
+
+    try {
+      org.virtualbox_5_1.VirtualBoxManager manager = org.virtualbox_5_1.VirtualBoxManager.createInstance(null);
+      manager.connect(host.getUrl(), host.getUsername(), host.getPassword().getPlainText());
+      version = manager.getVBox().getVersion();
+      manager.disconnect();
+    } catch (Exception e) { 
+      // fallback to old method
+      com.sun.xml.ws.commons.virtualbox_3_1.IWebsessionManager manager = new com.sun.xml.ws.commons.virtualbox_3_1.IWebsessionManager(host.getUrl());
+      com.sun.xml.ws.commons.virtualbox_3_1.IVirtualBox vbox = manager.logon(host.getUsername(), host.getPassword().getPlainText());
+      version = vbox.getVersion();
+      manager.disconnect(vbox);
+    }
 
     logInfo("Creating connection to VirtualBox version " + version);
     if (version.startsWith("5.1")) {
-        vboxControl = new VirtualBoxControlV51(host.getUrl(), host.getUsername(), host.getPassword());
+      vboxControl = new VirtualBoxControlV51(host.getUrl(), host.getUsername(), host.getPassword());
     } else if (version.startsWith("5.0")) {
-        vboxControl = new VirtualBoxControlV50(host.getUrl(), host.getUsername(), host.getPassword());
+      vboxControl = new VirtualBoxControlV50(host.getUrl(), host.getUsername(), host.getPassword());
     } else if (version.startsWith("4.3")) {
       vboxControl = new VirtualBoxControlV43(host.getUrl(), host.getUsername(), host.getPassword());
     } else if (version.startsWith("4.2")) {
