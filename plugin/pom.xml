@@ -60,6 +60,11 @@
       <artifactId>vboxws-52</artifactId>
       <version>5.2.32</version>
     </dependency>
+    <dependency>
+      <groupId>org.virtualbox</groupId>
+      <artifactId>vboxws-60</artifactId>
+      <version>6.0.10</version>
+    </dependency>
   </dependencies>
 
   <repositories>
