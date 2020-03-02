@@ -13,7 +13,8 @@ public final class VirtualBoxUtils {
   // public methods
   public static long startVm(final VirtualBoxMachine machine, final String snapshotName, final String virtualMachineType) {
     return executeWithVboxControl(machine.getHost(), new VBoxControlCallback<Long>() {
-      public Long doWithVboxControl(VirtualBoxControl vboxControl) {
+      @Override
+    public Long doWithVboxControl(final VirtualBoxControl vboxControl) {
         return vboxControl.startVm(machine, snapshotName, virtualMachineType);
       }
     });
@@ -21,7 +22,8 @@ public final class VirtualBoxUtils {
 
   public static long stopVm(final VirtualBoxMachine machine, final String snapshotName, final String virtualMachineStopMode) {
     return executeWithVboxControl(machine.getHost(), new VBoxControlCallback<Long>() {
-      public Long doWithVboxControl(VirtualBoxControl vboxControl) {
+      @Override
+    public Long doWithVboxControl(final VirtualBoxControl vboxControl) {
         return vboxControl.stopVm(machine, snapshotName, virtualMachineStopMode);
       }
     });
@@ -29,7 +31,8 @@ public final class VirtualBoxUtils {
 
   public static List<VirtualBoxMachine> getMachines(final VirtualBoxCloud host) {
     return executeWithVboxControl(host, new VBoxControlCallback<List<VirtualBoxMachine>>() {
-      public List<VirtualBoxMachine> doWithVboxControl(VirtualBoxControl vboxControl) {
+      @Override
+    public List<VirtualBoxMachine> doWithVboxControl(final VirtualBoxControl vboxControl) {
         return vboxControl.getMachines(host);
       }
     });
@@ -37,7 +40,8 @@ public final class VirtualBoxUtils {
 
   public static String[] getSnapshots(final VirtualBoxCloud host, final String virtualMachineName) {
     return executeWithVboxControl(host, new VBoxControlCallback<String[]>() {
-      public String[] doWithVboxControl(VirtualBoxControl vboxControl) {
+      @Override
+    public String[] doWithVboxControl(final VirtualBoxControl vboxControl) {
         return vboxControl.getSnapshots(virtualMachineName);
       }
     });
@@ -45,7 +49,8 @@ public final class VirtualBoxUtils {
 
   public static String getMacAddress(final VirtualBoxMachine machine) {
     return executeWithVboxControl(machine.getHost(), new VBoxControlCallback<String>() {
-      public String doWithVboxControl(VirtualBoxControl vboxControl) {
+      @Override
+    public String doWithVboxControl(final VirtualBoxControl vboxControl) {
         return vboxControl.getMacAddress(machine);
       }
     });
@@ -55,8 +60,8 @@ public final class VirtualBoxUtils {
   private VirtualBoxUtils() {
   }
 
-  private synchronized static <T> T executeWithVboxControl(VirtualBoxCloud host, VBoxControlCallback<T> vBoxControlCallback) {
-    VirtualBoxControl vboxControl = getVboxControl(host);
+  private synchronized static <T> T executeWithVboxControl(final VirtualBoxCloud host, final VBoxControlCallback<T> vBoxControlCallback) {
+    final VirtualBoxControl vboxControl = getVboxControl(host);
     try {
       return vBoxControlCallback.doWithVboxControl(vboxControl);
     } finally {
@@ -64,31 +69,33 @@ public final class VirtualBoxUtils {
     }
   }
 
-  private static VirtualBoxControl getVboxControl(VirtualBoxCloud host) {
+  private static VirtualBoxControl getVboxControl(final VirtualBoxCloud host) {
     return createVboxControl(host);
   }
 
-  private static VirtualBoxControl createVboxControl(VirtualBoxCloud host) {
+  private static VirtualBoxControl createVboxControl(final VirtualBoxCloud host) {
     VirtualBoxControl vboxControl = null;
 
     logInfo("Trying to connect to " + host.getUrl() + ", user " + host.getUsername());
     String version = null;
 
     try {
-      org.virtualbox_6_0.VirtualBoxManager manager = org.virtualbox_6_0.VirtualBoxManager.createInstance(null);
+      final org.virtualbox_6_1.VirtualBoxManager manager = org.virtualbox_6_1.VirtualBoxManager.createInstance(null);
       manager.connect(host.getUrl(), host.getUsername(), host.getPassword().getPlainText());
       version = manager.getVBox().getVersion();
       manager.disconnect();
-    } catch (Exception e) { 
+    } catch (final Exception e) { 
       // fallback to old method
-      com.sun.xml.ws.commons.virtualbox_3_1.IWebsessionManager manager = new com.sun.xml.ws.commons.virtualbox_3_1.IWebsessionManager(host.getUrl());
-      com.sun.xml.ws.commons.virtualbox_3_1.IVirtualBox vbox = manager.logon(host.getUsername(), host.getPassword().getPlainText());
+      final com.sun.xml.ws.commons.virtualbox_3_1.IWebsessionManager manager = new com.sun.xml.ws.commons.virtualbox_3_1.IWebsessionManager(host.getUrl());
+      final com.sun.xml.ws.commons.virtualbox_3_1.IVirtualBox vbox = manager.logon(host.getUsername(), host.getPassword().getPlainText());
       version = vbox.getVersion();
       manager.disconnect(vbox);
     }
 
     logInfo("Creating connection to VirtualBox version " + version);
-    if (version.startsWith("6.0")) {
+    if (version.startsWith("6.1")) {
+        vboxControl = new VirtualBoxControlV61(host.getUrl(), host.getUsername(), host.getPassword());
+    } else if (version.startsWith("6.0")) {
         vboxControl = new VirtualBoxControlV60(host.getUrl(), host.getUsername(), host.getPassword());
     } else if (version.startsWith("5.2")) {
         vboxControl = new VirtualBoxControlV52(host.getUrl(), host.getUsername(), host.getPassword());

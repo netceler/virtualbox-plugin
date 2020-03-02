@@ -58,12 +58,17 @@
     <dependency>
       <groupId>org.virtualbox</groupId>
       <artifactId>vboxws-52</artifactId>
-      <version>5.2.32</version>
+      <version>5.2.38</version>
     </dependency>
     <dependency>
       <groupId>org.virtualbox</groupId>
       <artifactId>vboxws-60</artifactId>
-      <version>6.0.10</version>
+      <version>6.0.18</version>
+    </dependency>
+    <dependency>
+      <groupId>org.virtualbox</groupId>
+      <artifactId>vboxws-61</artifactId>
+      <version>6.1.4</version>
     </dependency>
   </dependencies>
 
