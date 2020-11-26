@@ -68,7 +68,7 @@
     <dependency>
       <groupId>org.virtualbox</groupId>
       <artifactId>vboxws-61</artifactId>
-      <version>6.1.4</version>
+      <version>6.1.16</version>
     </dependency>
   </dependencies>
 
