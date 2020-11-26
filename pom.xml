@@ -3,11 +3,12 @@
   <parent>
     <groupId>org.jenkins-ci.plugins</groupId>
     <artifactId>plugin</artifactId>
-    <version>2.17</version>
+    <version>4.13</version>
+    <relativePath />
   </parent>
 
   <artifactId>virtualbox-parent</artifactId>
-  <version>0.8-SNAPSHOT</version>
+  <version>${revision}${changelist}</version>
   <packaging>pom</packaging>
   <name>Jenkins VirtualBox Parent</name>
 
@@ -53,8 +54,10 @@
   </scm>
 
   <properties>
-    <jenkins.version>2.19.2</jenkins.version>
-    <java.level>7</java.level>
+    <revision>0.8</revision>
+    <changelist>-SNAPSHOT</changelist>
+    <jenkins.version>2.268</jenkins.version>
+    <java.level>8</java.level>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 
@@ -68,18 +71,6 @@
   <build>
     <pluginManagement>
       <plugins>
-        <plugin>
-          <artifactId>maven-compiler-plugin</artifactId>
-          <version>3.6.0</version>
-        </plugin>
-        <plugin>
-          <artifactId>maven-surefire-plugin</artifactId>
-          <version>2.19.1</version>
-        </plugin>
-        <plugin>
-          <artifactId>maven-release-plugin</artifactId>
-          <version>2.5.3</version>
-        </plugin>
         <plugin>
           <groupId>org.eclipse.m2e</groupId>
           <artifactId>lifecycle-mapping</artifactId>
@@ -165,7 +156,6 @@
 
     <plugins>
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-release-plugin</artifactId>
         <configuration>
           <goals>deploy</goals>

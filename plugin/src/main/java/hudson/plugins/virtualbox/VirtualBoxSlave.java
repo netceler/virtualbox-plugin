@@ -44,15 +44,16 @@ public class VirtualBoxSlave extends Slave {
   ) throws Descriptor.FormException, IOException {
     super(
         name,
-        nodeDescription,
         remoteFS,
-        numExecutors,
-        mode,
-        labelString,
-        new VirtualBoxComputerLauncher(delegateLauncher, hostName, virtualMachineName, snapshotName, virtualMachineType, virtualMachineStopMode,startupWaitingPeriodSeconds),
-        retentionStrategy,
-        nodeProperties
+        new VirtualBoxComputerLauncher(delegateLauncher, hostName, virtualMachineName, snapshotName, virtualMachineType, virtualMachineStopMode,startupWaitingPeriodSeconds)
     );
+    Number n = Util.tryParseNumber(numExecutors, 1);
+    setNodeDescription(nodeDescription);
+    setNumExecutors(n != null ? n.intValue() : 1);
+    setMode(mode);
+    setLabelString(labelString);
+    setRetentionStrategy(retentionStrategy);
+    setNodeProperties(nodeProperties);
     this.hostName = hostName;
     this.virtualMachineName = virtualMachineName;
     this.snapshotName = snapshotName;

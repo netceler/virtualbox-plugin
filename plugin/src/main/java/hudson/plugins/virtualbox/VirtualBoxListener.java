@@ -2,6 +2,7 @@ package hudson.plugins.virtualbox;
 
 import static hudson.plugins.virtualbox.VirtualBoxLogger.logFatalError;
 import static hudson.plugins.virtualbox.VirtualBoxLogger.logInfo;
+import static hudson.plugins.virtualbox.VirtualBoxLogger.logWarning;
 import static java.lang.Thread.sleep;
 
 import java.io.Serializable;
@@ -11,7 +12,9 @@ import hudson.model.Computer;
 import hudson.model.Executor;
 import hudson.model.Run;
 import hudson.model.listeners.RunListener;
+import hudson.remoting.Channel;
 import hudson.slaves.OfflineCause;
+import hudson.slaves.SlaveComputer;
 
 @Extension
 public class VirtualBoxListener extends RunListener<Run<?, ?>> implements Serializable {
@@ -35,12 +38,22 @@ public class VirtualBoxListener extends RunListener<Run<?, ?>> implements Serial
                         logInfo("Reverting slave " + slave.getDisplayName()
                                 + " to configured snapshot, as requested per configuration of this slave.");
                         try {
-                            slave.getComputer().getChannel().syncLocalIO();
-                            slave.getComputer().getChannel().close();
-                            c.disconnect(new OfflineCause.ByCLI("Reverted by VirtualBox plugin")).get();
-                            slave.getComputer().waitUntilOffline();
-                            sleep(15000);
-                            logInfo("End of onFinalized() for slave " + slave.getDisplayName());
+                            final SlaveComputer computer = slave.getComputer();
+                            if (computer != null) {
+                                final Channel channel = computer.getChannel();
+                                if (channel != null) {
+                                    computer.getChannel().syncLocalIO();
+                                    computer.getChannel().close();
+                                } else {
+                                    logWarning("Channel of computer " + c.getDisplayName() + " is null");
+                                }
+                                c.disconnect(new OfflineCause.ByCLI("Reverted by VirtualBox plugin")).get();
+                                computer.waitUntilOffline();
+                                sleep(15000);
+                                logInfo("End of onFinalized() for slave " + slave.getDisplayName());
+                            } else {
+                                logWarning("Computer " + c.getDisplayName() + " is null");
+                            }
                         } catch (final Exception ex) {
                             logFatalError("Error while reverting slave " + slave.getDisplayName(), ex);
                         }
